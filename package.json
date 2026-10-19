@@ -1,0 +1,10 @@
+{
+  "name": "fimonaa-commerce-hub",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["apps/*", "libs/*"],
+  "scripts": {
+    "dev:api": "npm --workspace apps/api run start:dev",
+    "build:api": "npm --workspace apps/api run build"
+  }
+}
