@@ -2,10 +2,9 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { HealthController } from './health.controller';
-import { DashboardController } from './dashboard.controller';
-import { InventoryImportController } from './inventory-import.controller';
-import { InventoryOpeningBalanceService } from './inventory-opening-balance.service';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { HealthModule } from './health/health.module';
+import { ImportsModule } from './imports/imports.module';
 
 @Module({
   imports: [
@@ -26,8 +25,10 @@ import { InventoryOpeningBalanceService } from './inventory-opening-balance.serv
         retryDelay: 3000,
       }),
     }),
+
+    HealthModule,
+    DashboardModule,
+    ImportsModule,
   ],
-  controllers: [HealthController, DashboardController, InventoryImportController],
-providers: [InventoryOpeningBalanceService],
 })
 export class AppModule {}
