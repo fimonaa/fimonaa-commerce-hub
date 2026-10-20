@@ -1,7 +1,11 @@
 import type { ReactNode } from 'react'
 
+export type WorkspacePage = 'dashboard' | 'inventory'
+
 type MainLayoutProps = {
   children: ReactNode
+  activePage: WorkspacePage
+  onNavigate: (page: WorkspacePage) => void
   onRefresh: () => void
   loading: boolean
 }
@@ -21,7 +25,7 @@ function Icon({
     activity: 'M3 12h4l3-8 4 16 3-8h4',
     imports: 'M12 3v12m-5-5 5 5 5-5 M4 17v4h16v-4',
     refresh:
-      'M20 7v5h-5 M4 17v-5h5 M5.6 9a7 7 0 0 1 11.7-2L20 12 M4 12l2.7 5a7 7 0 0 0 11.7-2',
+      'M20 7v5h-5 M4 17v-5h5 M5.6 9a7 7 0 0 1 11.7-2L20 12 M4 12l2.7 5a7 7 0 0 1 1.7-2',
   }
 
   return (
@@ -41,14 +45,16 @@ function Icon({
 }
 
 const navigation = [
-  { label: 'Dashboard', icon: 'dashboard', active: true },
-  { label: 'Inventory', icon: 'inventory', active: false },
-  { label: 'Stock Movements', icon: 'activity', active: false },
-  { label: 'Imports', icon: 'imports', active: false },
+  { label: 'Dashboard', icon: 'dashboard', page: 'dashboard' as const },
+  { label: 'Inventory', icon: 'inventory', page: 'inventory' as const },
+  { label: 'Stock Movements', icon: 'activity', page: null },
+  { label: 'Imports', icon: 'imports', page: null },
 ]
 
 export default function MainLayout({
   children,
+  activePage,
+  onNavigate,
   onRefresh,
   loading,
 }: MainLayoutProps) {
@@ -74,25 +80,33 @@ export default function MainLayout({
           </p>
 
           <nav aria-label="Main navigation" className="mt-3 space-y-1">
-            {navigation.map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                aria-current={item.active ? 'page' : undefined}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
-                  item.active
-                    ? 'bg-[#f9eaf0] font-semibold text-[#a92f62]'
-                    : 'text-[#756b6e] hover:bg-[#faf5f6]'
-                }`}
-              >
-                <Icon name={item.icon} />
-                {item.label}
+            {navigation.map((item) => {
+              const isActive = item.page === activePage
 
-                {item.active && (
-                  <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#b6386d]" />
-                )}
-              </button>
-            ))}
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  disabled={!item.page}
+                  aria-current={isActive ? 'page' : undefined}
+                  onClick={() => {
+                    if (item.page) onNavigate(item.page)
+                  }}
+                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
+                    isActive
+                      ? 'bg-[#f9eaf0] font-semibold text-[#a92f62]'
+                      : 'text-[#756b6e] hover:bg-[#faf5f6] disabled:cursor-not-allowed disabled:opacity-50'
+                  }`}
+                >
+                  <Icon name={item.icon} />
+                  {item.label}
+
+                  {isActive && (
+                    <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#b6386d]" />
+                  )}
+                </button>
+              )
+            })}
           </nav>
         </div>
 
@@ -118,11 +132,11 @@ export default function MainLayout({
         <header className="flex min-h-24 flex-wrap items-center justify-between gap-4 border-b border-[#eee5e4] bg-white/80 px-5 py-5 backdrop-blur sm:px-8 lg:px-10">
           <div>
             <p className="text-xs font-medium text-[#a09295]">
-              Workspace / Overview
+              Workspace / {activePage === 'inventory' ? 'Inventory' : 'Overview'}
             </p>
 
             <h1 className="mt-1.5 text-2xl font-semibold tracking-tight">
-              Inventory dashboard
+              {activePage === 'inventory' ? 'Inventory management' : 'Inventory dashboard'}
             </h1>
           </div>
 

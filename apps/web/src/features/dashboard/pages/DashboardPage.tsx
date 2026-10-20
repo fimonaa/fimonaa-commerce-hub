@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import MainLayout from '../../../layouts/MainLayout'
+import MainLayout, {
+  type WorkspacePage,
+} from '../../../layouts/MainLayout'
 import { getDashboardSummary } from '../services/dashboard.service'
 import type { DashboardSummary } from '../types/dashboard.types'
 
@@ -100,64 +102,76 @@ const metrics = [
   },
 ]
 
-export default function DashboardPage() {
+// Define the navigation callback that App.tsx passes to this page.
+type DashboardPageProps = {
+  onNavigate: (page: WorkspacePage) => void
+}
+
+export default function DashboardPage({
+  onNavigate,
+}: DashboardPageProps) {
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
 
   const loadSummary = useCallback(async () => {
-        setLoading(true)
-        setError('')
+    setLoading(true)
+    setError('')
 
-        try {
-            const data = await getDashboardSummary()
-            setSummary(data)
-            return data
-        } catch (err) {
-            setError(
-            err instanceof Error
-                ? err.message
-                : 'Could not load dashboard data.',
-            )
-            return null
-        } finally {
-            setLoading(false)
+    try {
+      const data = await getDashboardSummary()
+      setSummary(data)
+      return data
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Could not load dashboard data.',
+      )
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    getDashboardSummary()
+      .then((data) => {
+        if (!cancelled) {
+          setSummary(data)
+          setError('')
         }
-    }, [])
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Could not load dashboard data.',
+          )
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      })
 
- useEffect(() => {
-  let cancelled = false
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
-  getDashboardSummary()
-    .then((data) => {
-      if (!cancelled) {
-        setSummary(data)
-        setError('')
-      }
-    })
-    .catch((err: unknown) => {
-      if (!cancelled) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'Could not load dashboard data.',
-        )
-      }
-    })
-    .finally(() => {
-      if (!cancelled) {
-        setLoading(false)
-      }
-    })
-
-  return () => {
-    cancelled = true
-  }
-}, [])
-
-    return (
-    <MainLayout onRefresh={() => void loadSummary()} loading={loading}>
+  return (
+    <MainLayout
+      activePage="dashboard"
+      onNavigate={onNavigate}
+      onRefresh={() => void loadSummary()}
+      loading={loading}
+    >
       <div className="mx-auto max-w-[1500px] space-y-8 px-5 py-8 sm:px-8 lg:px-10 lg:py-10">
         {/* Welcome banner */}
         <section className="relative overflow-hidden rounded-3xl bg-[#34272d] px-6 py-7 text-white sm:px-9 sm:py-9">
