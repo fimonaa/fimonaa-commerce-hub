@@ -4,6 +4,9 @@
 !.env.example
 !.env.template
 
+# TypeScript incremental build metadata
+*.tsbuildinfo
+
 # Dependencies
 node_modules/
 **/node_modules/
