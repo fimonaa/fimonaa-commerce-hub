@@ -8,7 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import * as XLSX from 'xlsx';
+import { ExcelWorkbookReaderService } from './excel-workbook-reader.service';
 
 interface OpeningBalanceRow {
   sku: string;
@@ -23,7 +23,8 @@ export class InventoryOpeningBalanceService {
   constructor(
     private readonly configService: ConfigService,
     private readonly dataSource: DataSource,
-  ) {}
+    private readonly excelWorkbookReaderService: ExcelWorkbookReaderService,
+  ) { }
 
   async importOpeningBalance() {
     const workbookPath = this.configService.get<string>(
@@ -48,28 +49,12 @@ export class InventoryOpeningBalanceService {
 
     const workbookName = workbookPath.split('/').pop() ?? 'SKU workbook';
     const worksheetName = 'SKU Generator';
-    let workbook: XLSX.WorkBook;
 
-    try {
-      workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
-    } catch {
-      throw new BadRequestException(
-        'The configured file is not a readable Excel workbook.',
+    const { rows: rawRows } =
+      await this.excelWorkbookReaderService.readWorksheet(
+        buffer,
+        worksheetName,
       );
-    }
-
-    const sheet = workbook.Sheets[worksheetName];
-
-    if (!sheet) {
-      throw new BadRequestException(
-        `Required worksheet "${worksheetName}" was not found.`,
-      );
-    }
-
-    const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
-      defval: null,
-      raw: false,
-    });
 
     const normalize = (value: unknown) => String(value ?? '').trim();
     const rows: OpeningBalanceRow[] = [];
@@ -78,9 +63,11 @@ export class InventoryOpeningBalanceService {
 
     rawRows.forEach((row, index) => {
       const sourceRow = index + 2;
+
       const hasAnyData = Object.values(row).some(
         (value) => normalize(value) !== '',
       );
+
       const sku = normalize(row['SKU Code']);
       const productName = normalize(row['Product Name']);
 

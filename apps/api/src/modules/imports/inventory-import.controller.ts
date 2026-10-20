@@ -11,13 +11,14 @@ import { ConfigService } from '@nestjs/config';
 import { readFile, stat } from 'node:fs/promises';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { InventoryOpeningBalanceService } from './inventory-opening-balance.service';
-import * as XLSX from 'xlsx';
+import { ExcelWorkbookReaderService } from './excel-workbook-reader.service';
 
 @Controller('inventory-import')
 export class InventoryImportController {
   constructor(
     private readonly configService: ConfigService,
     private readonly inventoryOpeningBalanceService: InventoryOpeningBalanceService,
+    private readonly excelWorkbookReaderService: ExcelWorkbookReaderService,
   ) {}
 
   @Get('validate-local')
@@ -47,7 +48,7 @@ export class InventoryImportController {
     }
 
     return {
-      ...this.validateWorkbookBuffer(
+      ...await this.validateWorkbookBuffer(
         buffer,
         workbookPath.split('/').pop() ?? 'SKU workbook',
       ),
@@ -70,33 +71,16 @@ export class InventoryImportController {
     return this.validateWorkbookBuffer(file.buffer, file.originalname);
   }
 
-  private validateWorkbookBuffer(buffer: Buffer, workbookName: string) {
-    let workbook: XLSX.WorkBook;
-
-    try {
-      workbook = XLSX.read(buffer, {
-        type: 'buffer',
-        cellDates: true,
-      });
-    } catch {
-      throw new BadRequestException(
-        'The uploaded file could not be read as an Excel workbook.',
-      );
-    }
-
+  private async validateWorkbookBuffer(
+    buffer: Buffer,
+    workbookName: string,
+  ) {
     const sheetName = 'SKU Generator';
-    const sheet = workbook.Sheets[sheetName];
 
-    if (!sheet) {
-      throw new BadRequestException(
-        `Required worksheet "${sheetName}" was not found.`,
-      );
-    }
-
-    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
-      defval: null,
-      raw: false,
-    });
+    const { rows } = await this.excelWorkbookReaderService.readWorksheet(
+      buffer,
+      sheetName,
+    );
 
     const normalize = (value: unknown) => String(value ?? '').trim();
 
@@ -131,20 +115,14 @@ export class InventoryImportController {
 
       if (!sku) {
         missingSkuRows += 1;
-        errors.push({
-          row: rowNumber,
-          issue: 'Missing SKU Code.',
-        });
+        errors.push({ row: rowNumber, issue: 'Missing SKU Code.' });
       } else {
         skuCounts.set(sku, (skuCounts.get(sku) ?? 0) + 1);
       }
 
       if (!productName) {
         missingProductNameRows += 1;
-        errors.push({
-          row: rowNumber,
-          issue: 'Missing Product Name.',
-        });
+        errors.push({ row: rowNumber, issue: 'Missing Product Name.' });
       }
 
       const initialStock =

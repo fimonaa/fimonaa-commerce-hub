@@ -1,11 +1,10 @@
-import { Controller, Get } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
-@Controller('dashboard')
-export class DashboardController {
+@Injectable()
+export class DashboardService {
   constructor(private readonly dataSource: DataSource) {}
 
-  @Get('summary')
   async getSummary() {
     const [inventory] = await this.dataSource.query(`
       SELECT
@@ -31,21 +30,9 @@ export class DashboardController {
       failedSyncJobs: 0,
 
       channels: [
-        {
-          code: 'shopify',
-          name: 'Shopify',
-          status: 'not_connected',
-        },
-        {
-          code: 'myntra',
-          name: 'Myntra',
-          status: 'not_connected',
-        },
-        {
-          code: 'ajio',
-          name: 'AJIO',
-          status: 'not_connected',
-        },
+        { code: 'shopify', name: 'Shopify', status: 'not_connected' },
+        { code: 'myntra', name: 'Myntra', status: 'not_connected' },
+        { code: 'ajio', name: 'AJIO', status: 'not_connected' },
         {
           code: 'nykaa',
           name: 'Nykaa Fashion',
