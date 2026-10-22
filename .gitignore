@@ -51,6 +51,9 @@ Thumbs.db
 database-exports/
 db-exports/
 
+# Local database backups can contain business data.
+backups/
+
 # Test and tool caches
 .eslintcache
 .turbo/

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Controller,
+  ForbiddenException,
   Get,
   InternalServerErrorException,
   Post,
@@ -10,16 +11,14 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { readFile, stat } from 'node:fs/promises';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { InventoryOpeningBalanceService } from './inventory-opening-balance.service';
 import { ExcelWorkbookReaderService } from './excel-workbook-reader.service';
 
 @Controller('inventory-import')
 export class InventoryImportController {
   constructor(
     private readonly configService: ConfigService,
-    private readonly inventoryOpeningBalanceService: InventoryOpeningBalanceService,
     private readonly excelWorkbookReaderService: ExcelWorkbookReaderService,
-  ) {}
+  ) { }
 
   @Get('validate-local')
   async validateLocalWorkbook() {
@@ -198,8 +197,22 @@ export class InventoryImportController {
       note: 'Validation only. No database records or Shopify inventory were changed.',
     };
   }
+  /**
+ * SECURITY:
+ * Opening-balance imports are temporarily disabled.
+ *
+ * This endpoint must not be enabled until:
+ * 1. Authentication is implemented.
+ * 2. Business membership and permissions are verified.
+ * 3. The import service supports business-specific inventory.
+ * 4. Integration tests confirm that businesses are isolated.
+ *
+ * Validation-only endpoints remain available.
+ */
   @Post('import-opening-balance')
-  async importOpeningBalance() {
-    return this.inventoryOpeningBalanceService.importOpeningBalance();
+  importOpeningBalance(): never {
+    throw new ForbiddenException(
+      'Opening-balance imports are temporarily disabled until business authorization is implemented.',
+    );
   }
 }
