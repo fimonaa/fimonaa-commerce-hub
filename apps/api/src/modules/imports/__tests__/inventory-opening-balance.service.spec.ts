@@ -76,7 +76,7 @@ describe('InventoryOpeningBalanceService', () => {
     });
   });
 
-    describe('business existence and status validation', () => {
+  describe('business existence and status validation', () => {
     const validBusinessId = '123e4567-e89b-42d3-a456-426614174000';
 
     beforeEach(() => {
@@ -141,7 +141,7 @@ describe('InventoryOpeningBalanceService', () => {
     });
   });
 
-    describe('duplicate opening-balance protection', () => {
+  describe('duplicate opening-balance protection', () => {
     const validBusinessId = '123e4567-e89b-42d3-a456-426614174000';
 
     beforeEach(() => {
@@ -219,7 +219,7 @@ describe('InventoryOpeningBalanceService', () => {
       expect(query).toHaveBeenCalledTimes(4);
     });
   });
-    describe('cross-business SKU collision protection', () => {
+  describe('tenant-scoped SKU imports', () => {
     const validBusinessId = '123e4567-e89b-42d3-a456-426614174000';
 
     beforeEach(() => {
@@ -241,7 +241,7 @@ describe('InventoryOpeningBalanceService', () => {
       });
     });
 
-    it('rejects an SKU already owned by another business', async () => {
+    it('allows a business to import SKU codes used by another business', async () => {
       const query = jest
         .fn()
         .mockResolvedValueOnce([]) // Advisory lock
@@ -252,11 +252,11 @@ describe('InventoryOpeningBalanceService', () => {
             status: 'active',
           },
         ]) // Business lookup
-        .mockResolvedValueOnce([]) // No previous imports
-        .mockResolvedValueOnce([]) // No existing SKUs in Finland
-        .mockResolvedValueOnce([
-          { sku: 'FIM-DRE-001-BLK-M' },
-        ]); // SKU already exists in India
+        .mockResolvedValueOnce([]) // No previous imports for Finland
+        .mockResolvedValueOnce([]) // No existing SKUs for Finland
+        .mockResolvedValueOnce([]) // Insert import history
+        .mockResolvedValueOnce([]) // Insert inventory SKU
+        .mockResolvedValueOnce([]); // Insert inventory movement
 
       mockDataSource.transaction.mockImplementation(
         async (
@@ -264,21 +264,37 @@ describe('InventoryOpeningBalanceService', () => {
         ) => callback({ query }),
       );
 
-      await expect(
-        service.importOpeningBalance(validBusinessId),
-      ).rejects.toThrow(ConflictException);
+      const result = await service.importOpeningBalance(validBusinessId);
 
-      expect(query).toHaveBeenCalledTimes(5);
+      expect(result).toMatchObject({
+        status: 'success',
+        businessId: validBusinessId,
+        businessName: 'Fimonaa Finland',
+        importedSkuCount: 1,
+        totalAvailableStock: 10,
+        movementRowsCreated: 1,
+      });
 
-      // No inventory or import records should be inserted.
+      expect(query).toHaveBeenCalledTimes(7);
+
+      // All inventory queries must be scoped to Finland's business ID.
+      const inventoryCheck = query.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes('FROM inventory_skus'),
+      );
+
+      expect(inventoryCheck?.[0]).toContain('WHERE business_id = $1');
+      expect(inventoryCheck?.[1]).toEqual([validBusinessId]);
+
+      // No global SKU collision query should be executed.
       expect(
-        query.mock.calls.some(([sql]: [string]) =>
-          sql.includes('INSERT INTO'),
+        query.mock.calls.some(
+          ([sql]: [string]) => sql.includes('WHERE sku = ANY'),
         ),
       ).toBe(false);
     });
   });
-    describe('business ownership during opening-balance imports', () => {
+  describe('business ownership during opening-balance imports', () => {
     const validBusinessId = '123e4567-e89b-42d3-a456-426614174000';
 
     beforeEach(() => {
@@ -312,8 +328,7 @@ describe('InventoryOpeningBalanceService', () => {
           },
         ]) // Business lookup
         .mockResolvedValueOnce([]) // No previous imports
-        .mockResolvedValueOnce([]) // No existing SKUs
-        .mockResolvedValueOnce([]) // No cross-business SKU collisions
+        .mockResolvedValueOnce([]) // No existing SKUs in this business
         .mockResolvedValueOnce([]) // Insert import history
         .mockResolvedValueOnce([]) // Insert inventory SKU
         .mockResolvedValueOnce([]); // Insert inventory movement
@@ -353,7 +368,7 @@ describe('InventoryOpeningBalanceService', () => {
         expect(parameters[0]).toBe(validBusinessId);
       });
 
-      expect(query).toHaveBeenCalledTimes(8);
+      expect(query).toHaveBeenCalledTimes(7);
     });
   });
 });

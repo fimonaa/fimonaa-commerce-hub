@@ -316,40 +316,7 @@ export class InventoryOpeningBalanceService {
       }
 
       /**
-       * STEP 9: Detect SKU collisions across businesses.
-       *
-       * CURRENT DATABASE LIMITATION:
-       *
-       * inventory_skus.sku is still the global primary key.
-       * Therefore, two businesses cannot currently use the
-       * same SKU code.
-       *
-       * We reject collisions before attempting an insert.
-       */
-      const incomingSkus = rows.map((row) => row.sku);
-
-      const skuCollisions: Array<{
-        sku: string;
-      }> = await manager.query(
-        `
-          SELECT sku
-          FROM inventory_skus
-          WHERE sku = ANY($1::text[])
-          LIMIT 10
-        `,
-        [incomingSkus],
-      );
-
-      if (skuCollisions.length > 0) {
-        throw new ConflictException({
-          message:
-            'Some SKU codes already exist in another business. Nothing was imported.',
-          conflictingSkus: skuCollisions.map((row) => row.sku),
-        });
-      }
-
-      /**
-       * STEP 10: Record the opening-balance import.
+       * STEP 9: Record the opening-balance import.
        *
        * Every import belongs to exactly one business.
        */
@@ -376,7 +343,7 @@ export class InventoryOpeningBalanceService {
       );
 
       /**
-       * STEP 11: Insert inventory and opening-balance movements.
+       * STEP 10: Insert inventory and opening-balance movements.
        *
        * Both inventory_skus and inventory_movements receive
        * the same business ID.
@@ -439,7 +406,7 @@ export class InventoryOpeningBalanceService {
       }
 
       /**
-       * STEP 12: Return the import summary.
+       * STEP 11: Return the import summary.
        */
       return {
         mode: 'opening-balance-import',
