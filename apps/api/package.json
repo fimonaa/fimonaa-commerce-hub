@@ -11,13 +11,18 @@
     "lint": "eslint --config eslint.config.mjs \"{src,test}/**/*.ts\"",
     "test": "jest --config jest.config.ts",
     "test:watch": "jest --config jest.config.ts --watch",
-    "test:cov": "jest --config jest.config.ts --coverage"
+    "test:cov": "jest --config jest.config.ts --coverage",
+    "migration:show": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:show",
+    "migration:run": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:run",
+    "migration:revert": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:revert",
+    "seed:businesses": "ts-node src/database/seed-businesses.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/swagger": "^11.4.7",
     "@nestjs/typeorm": "^11.0.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
@@ -41,6 +46,8 @@
     "eslint": "^10.13.0",
     "jest": "^30.5.2",
     "ts-jest": "^29.4.15",
+    "ts-node": "^10.9.2",
+    "typeorm-ts-node-commonjs": "^0.3.20",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.72.0"
   }

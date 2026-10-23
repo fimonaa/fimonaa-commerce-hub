@@ -10,6 +10,9 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { ExcelWorkbookReaderService } from './excel-workbook-reader.service';
 
+/**
+ * A validated inventory row extracted from the Excel workbook.
+ */
 interface OpeningBalanceRow {
   sku: string;
   productName: string;
@@ -18,6 +21,16 @@ interface OpeningBalanceRow {
   sourceRow: number;
 }
 
+/**
+ * Imports the opening inventory balance for a specific business.
+ *
+ * IMPORTANT:
+ * This service must only be called after authentication and
+ * business-level authorization have been verified.
+ *
+ * The public import endpoint remains disabled until those
+ * security controls are implemented.
+ */
 @Injectable()
 export class InventoryOpeningBalanceService {
   constructor(
@@ -26,7 +39,32 @@ export class InventoryOpeningBalanceService {
     private readonly excelWorkbookReaderService: ExcelWorkbookReaderService,
   ) { }
 
-  async importOpeningBalance() {
+  /**
+   * Imports opening inventory into an explicitly selected business.
+   *
+   * The entire database operation runs inside one transaction.
+   * If any database operation fails, PostgreSQL rolls back all changes.
+   */
+  async importOpeningBalance(businessId: string) {
+    /**
+     * STEP 1: Validate the business ID.
+     *
+     * A valid UUID format is required.
+     * Business existence and status are verified later in the transaction.
+     */
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        businessId,
+      )
+    ) {
+      throw new BadRequestException(
+        'A valid business ID is required for opening-balance imports.',
+      );
+    }
+
+    /**
+     * STEP 2: Locate the configured Excel workbook.
+     */
     const workbookPath = this.configService.get<string>(
       'FIMONAA_SKU_WORKBOOK_PATH',
     );
@@ -50,6 +88,9 @@ export class InventoryOpeningBalanceService {
     const workbookName = workbookPath.split('/').pop() ?? 'SKU workbook';
     const worksheetName = 'SKU Generator';
 
+    /**
+     * STEP 3: Read the inventory worksheet.
+     */
     const { rows: rawRows } =
       await this.excelWorkbookReaderService.readWorksheet(
         buffer,
@@ -57,10 +98,16 @@ export class InventoryOpeningBalanceService {
       );
 
     const normalize = (value: unknown) => String(value ?? '').trim();
+
     const rows: OpeningBalanceRow[] = [];
     const seenSkus = new Set<string>();
     const errors: string[] = [];
 
+    /**
+     * STEP 4: Validate every populated inventory row.
+     *
+     * Validation happens before any database writes.
+     */
     rawRows.forEach((row, index) => {
       const sourceRow = index + 2;
 
@@ -91,6 +138,12 @@ export class InventoryOpeningBalanceService {
         seenSkus.add(sku);
       }
 
+      /**
+       * Convert Excel stock values into whole numbers.
+       *
+       * Empty values return null.
+       * Decimal or nonnumeric values are rejected.
+       */
       const parseStock = (value: unknown): number | null => {
         const text = normalize(value);
 
@@ -142,6 +195,11 @@ export class InventoryOpeningBalanceService {
       }
     });
 
+    /**
+     * Reject the entire workbook if validation fails.
+     *
+     * We never partially import an invalid workbook.
+     */
     if (errors.length > 0) {
       throw new BadRequestException({
         message:
@@ -154,80 +212,161 @@ export class InventoryOpeningBalanceService {
       throw new BadRequestException('No SKU rows were found to import.');
     }
 
-    const importKey = createHash('sha256').update(buffer).digest('hex');
+    /**
+     * STEP 5: Calculate import metadata.
+     *
+     * The SHA-256 hash identifies the workbook contents.
+     */
+    const importKey = createHash('sha256')
+      .update(buffer)
+      .digest('hex');
 
     const totalAvailableStock = rows.reduce(
       (sum, row) => sum + row.availableStock,
       0,
     );
 
+    /**
+     * STEP 6: Begin the database transaction.
+     *
+     * All inventory records, movements, and import history
+     * are committed together or rolled back together.
+     */
     return this.dataSource.transaction(async (manager) => {
+      /**
+       * Prevent simultaneous opening-balance imports into
+       * the same business.
+       *
+       * The lock is automatically released when the
+       * transaction completes.
+       */
       await manager.query(
-        "SELECT pg_advisory_xact_lock(hashtext('fimonaa-opening-balance-import'))",
+        `
+          SELECT pg_advisory_xact_lock(
+            hashtext('fimonaa-opening-balance-import'),
+            hashtext($1::text)
+          )
+        `,
+        [businessId],
       );
 
-      await manager.query(`
-        CREATE TABLE IF NOT EXISTS inventory_skus (
-          sku TEXT PRIMARY KEY,
-          product_name TEXT NOT NULL,
-          initial_stock INTEGER NULL,
-          available_stock INTEGER NOT NULL CHECK (available_stock >= 0),
-          source_sheet TEXT NOT NULL,
-          source_row INTEGER NOT NULL,
-          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-      `);
-
-      await manager.query(`
-        CREATE TABLE IF NOT EXISTS inventory_opening_balance_imports (
-          id BIGSERIAL PRIMARY KEY,
-          import_key TEXT NOT NULL UNIQUE,
-          workbook_name TEXT NOT NULL,
-          worksheet_name TEXT NOT NULL,
-          sku_count INTEGER NOT NULL,
-          total_available_stock BIGINT NOT NULL,
-          imported_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-      `);
-
-      await manager.query(`
-        CREATE TABLE IF NOT EXISTS inventory_movements (
-          id BIGSERIAL PRIMARY KEY,
-          sku TEXT NOT NULL REFERENCES inventory_skus(sku),
-          movement_type TEXT NOT NULL,
-          quantity_delta INTEGER NOT NULL,
-          quantity_after INTEGER NOT NULL,
-          reference TEXT NOT NULL,
-          notes TEXT NOT NULL,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-      `);
-
-      const priorRuns = await manager.query(
-        'SELECT id FROM inventory_opening_balance_imports LIMIT 1',
+      /**
+       * STEP 7: Verify the target business exists and is active.
+       */
+      const businesses: Array<{
+        id: string;
+        name: string;
+        status: string;
+      }> = await manager.query(
+        `
+          SELECT id, name, status
+          FROM businesses
+          WHERE id = $1
+          LIMIT 1
+        `,
+        [businessId],
       );
 
-      const priorSkus = await manager.query(
-        'SELECT sku FROM inventory_skus LIMIT 1',
+      if (businesses.length === 0) {
+        throw new BadRequestException(
+          'The selected business does not exist.',
+        );
+      }
+
+      const business = businesses[0];
+
+      if (business.status !== 'active') {
+        throw new ConflictException(
+          'Opening-balance imports are only permitted for active businesses.',
+        );
+      }
+
+      /**
+       * STEP 8: Check whether this business already has inventory.
+       *
+       * A business must not receive another opening-balance import
+       * when inventory or an opening-balance import already exists.
+       *
+       * Other businesses are checked independently.
+       */
+      const priorRuns: Array<{ id: number }> = await manager.query(
+        `
+          SELECT id
+          FROM inventory_opening_balance_imports
+          WHERE business_id = $1
+          LIMIT 1
+        `,
+        [businessId],
+      );
+
+      const priorSkus: Array<{ sku: string }> = await manager.query(
+        `
+          SELECT sku
+          FROM inventory_skus
+          WHERE business_id = $1
+          LIMIT 1
+        `,
+        [businessId],
       );
 
       if (priorRuns.length > 0 || priorSkus.length > 0) {
         throw new ConflictException(
-          'Inventory already contains SKUs or an opening balance import. Nothing was imported. Review the database before attempting a replacement.',
+          'This business already contains inventory or an opening-balance import. Nothing was imported.',
         );
       }
 
+      /**
+       * STEP 9: Detect SKU collisions across businesses.
+       *
+       * CURRENT DATABASE LIMITATION:
+       *
+       * inventory_skus.sku is still the global primary key.
+       * Therefore, two businesses cannot currently use the
+       * same SKU code.
+       *
+       * We reject collisions before attempting an insert.
+       */
+      const incomingSkus = rows.map((row) => row.sku);
+
+      const skuCollisions: Array<{
+        sku: string;
+      }> = await manager.query(
+        `
+          SELECT sku
+          FROM inventory_skus
+          WHERE sku = ANY($1::text[])
+          LIMIT 10
+        `,
+        [incomingSkus],
+      );
+
+      if (skuCollisions.length > 0) {
+        throw new ConflictException({
+          message:
+            'Some SKU codes already exist in another business. Nothing was imported.',
+          conflictingSkus: skuCollisions.map((row) => row.sku),
+        });
+      }
+
+      /**
+       * STEP 10: Record the opening-balance import.
+       *
+       * Every import belongs to exactly one business.
+       */
       await manager.query(
-        `INSERT INTO inventory_opening_balance_imports
-          (
+        `
+          INSERT INTO inventory_opening_balance_imports (
+            business_id,
             import_key,
             workbook_name,
             worksheet_name,
             sku_count,
             total_available_stock
           )
-         VALUES ($1, $2, $3, $4, $5)`,
+          VALUES ($1, $2, $3, $4, $5, $6)
+        `,
         [
+          businessId,
           importKey,
           workbookName,
           worksheetName,
@@ -236,10 +375,17 @@ export class InventoryOpeningBalanceService {
         ],
       );
 
+      /**
+       * STEP 11: Insert inventory and opening-balance movements.
+       *
+       * Both inventory_skus and inventory_movements receive
+       * the same business ID.
+       */
       for (const row of rows) {
         await manager.query(
-          `INSERT INTO inventory_skus
-            (
+          `
+            INSERT INTO inventory_skus (
+              business_id,
               sku,
               product_name,
               initial_stock,
@@ -247,8 +393,10 @@ export class InventoryOpeningBalanceService {
               source_sheet,
               source_row
             )
-           VALUES ($1, $2, $3, $4, $5, $6)`,
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+          `,
           [
+            businessId,
             row.sku,
             row.productName,
             row.initialStock,
@@ -259,8 +407,9 @@ export class InventoryOpeningBalanceService {
         );
 
         await manager.query(
-          `INSERT INTO inventory_movements
-            (
+          `
+            INSERT INTO inventory_movements (
+              business_id,
               sku,
               movement_type,
               quantity_delta,
@@ -268,8 +417,18 @@ export class InventoryOpeningBalanceService {
               reference,
               notes
             )
-           VALUES ($1, 'OPENING_BALANCE', $2, $3, $4, $5)`,
+            VALUES (
+              $1,
+              $2,
+              'OPENING_BALANCE',
+              $3,
+              $4,
+              $5,
+              $6
+            )
+          `,
           [
+            businessId,
             row.sku,
             row.availableStock,
             row.availableStock,
@@ -279,15 +438,21 @@ export class InventoryOpeningBalanceService {
         );
       }
 
+      /**
+       * STEP 12: Return the import summary.
+       */
       return {
         mode: 'opening-balance-import',
         status: 'success',
+        businessId,
+        businessName: business.name,
         workbook: workbookName,
         worksheet: worksheetName,
         importedSkuCount: rows.length,
         totalAvailableStock,
         movementRowsCreated: rows.length,
-        note: 'Current Available Stock was imported as opening balance. Initial Stock was retained as metadata only. No historical orders, returns, or Shopify inventory were changed.',
+        note:
+          'Current Available Stock was imported as opening balance. Initial Stock was retained as metadata only. No historical orders, returns, or Shopify inventory were changed.',
       };
     });
   }
