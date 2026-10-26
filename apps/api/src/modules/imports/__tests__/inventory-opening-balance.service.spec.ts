@@ -21,6 +21,7 @@ describe('InventoryOpeningBalanceService', () => {
   };
 
   const mockDataSource = {
+    query: jest.fn().mockResolvedValue([{ database_name: 'fimonaa_commerce_import_test' }]),
     transaction: jest.fn(),
   };
 
@@ -371,4 +372,48 @@ describe('InventoryOpeningBalanceService', () => {
       expect(query).toHaveBeenCalledTimes(7);
     });
   });
+
+  describe('transaction failure handling', () => {
+    it('propagates an inventory movement insert failure', async () => {
+      const businessId = '123e4567-e89b-42d3-a456-426614174000';
+
+      mockConfigService.get.mockReturnValue('/test/sku-workbook.xlsx');
+      jest.mocked(readFile).mockResolvedValue(Buffer.from('mock-workbook'));
+
+      mockExcelWorkbookReaderService.readWorksheet.mockResolvedValue({
+        rows: [{
+          'SKU Code': 'FIM-DRE-001-BLK-M',
+          'Product Name': 'Test Dress',
+          'Initial Stock': 10,
+          'Available Stock': 10,
+        }],
+      });
+
+      const query = jest.fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{
+          id: businessId,
+          name: 'Fimonaa Finland',
+          status: 'active',
+        }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockRejectedValueOnce(new Error('Movement insert failed'));
+
+      mockDataSource.transaction.mockImplementation(
+        async (callback: (manager: { query: typeof query }) => Promise<unknown>) =>
+          callback({ query }),
+      );
+
+      await expect(
+        service.importOpeningBalance(businessId),
+      ).rejects.toThrow('Movement insert failed');
+
+      expect(query).toHaveBeenCalledTimes(7);
+      expect(query.mock.calls[6][0]).toContain('INSERT INTO inventory_movements');
+    });
+  });
+
 });

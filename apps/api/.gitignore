@@ -1,0 +1,6 @@
+
+
+# Generated test helper compilation artifacts
+test/helpers/*.js
+test/helpers/*.js.map
+test/helpers/*.d.ts

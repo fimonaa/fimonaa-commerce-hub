@@ -46,6 +46,21 @@ export class InventoryOpeningBalanceService {
    * If any database operation fails, PostgreSQL rolls back all changes.
    */
   async importOpeningBalance(businessId: string) {
+    // SECURITY: HTTP imports remain restricted to the disposable test database.
+    // Production imports require a separately reviewed and approved procedure.
+    const databaseRows: Array<{ database_name: string }> =
+      await this.dataSource.query(
+        'SELECT current_database() AS database_name',
+      );
+
+    if (
+      databaseRows[0]?.database_name !== 'fimonaa_commerce_import_test'
+    ) {
+      throw new ConflictException(
+        'Opening-balance imports are restricted to the isolated test database.',
+      );
+    }
+
     /**
      * STEP 1: Validate the business ID.
      *

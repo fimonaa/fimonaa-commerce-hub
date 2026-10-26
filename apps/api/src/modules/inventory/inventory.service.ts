@@ -17,6 +17,7 @@ export class InventoryService {
   constructor(private readonly dataSource: DataSource) {}
 
   async listInventory(
+    businessId: string,
     query: ListInventoryQueryDto,
   ): Promise<InventoryListResponse> {
     const {
@@ -28,8 +29,10 @@ export class InventoryService {
 
     // Share the WHERE clause between the count and result queries
     // so both queries apply exactly the same filters.
-    const conditions: string[] = [];
-    const parameters: unknown[] = [];
+    // Every inventory query must be restricted to one business.
+    // Bind the business UUID as the first SQL parameter.
+    const conditions: string[] = ['business_id = $1'];
+    const parameters: unknown[] = [businessId];
 
     if (search?.trim()) {
       // Bind the search term separately to prevent SQL injection.
