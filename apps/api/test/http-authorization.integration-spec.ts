@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { resolve } from 'node:path';
-import request = require('supertest');
+import * as request from 'supertest';
 import { DataSource } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 
