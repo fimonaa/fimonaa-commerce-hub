@@ -2,9 +2,20 @@
   "name": "fimonaa-commerce-hub",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["apps/*", "libs/*"],
+  "workspaces": [
+    "apps/*",
+    "libs/*"
+  ],
   "scripts": {
     "dev:api": "npm --workspace apps/api run start:dev",
     "build:api": "npm --workspace apps/api run build"
+  },
+  "overrides": {
+    "@nestjs/swagger@11.4.7": {
+      "js-yaml": "5.5.0"
+    },
+    "@nestjs/platform-express": {
+      "multer": "2.5.0"
+    }
   }
 }

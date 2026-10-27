@@ -28,6 +28,7 @@ describe('InventoryService', () => {
       .mockResolvedValueOnce([]);
 
     const result = await service.listInventory(
+      '11111111-1111-4111-8111-111111111111',
       new ListInventoryQueryDto(),
     );
 
@@ -47,8 +48,8 @@ describe('InventoryService', () => {
     const resultQuery = dataSource.query.mock.calls[1][0] as string;
 
     expect(resultQuery).toContain('ORDER BY sku ASC');
-    expect(resultQuery).toContain('LIMIT $1');
-    expect(resultQuery).toContain('OFFSET $2');
+    expect(resultQuery).toContain('LIMIT $2');
+    expect(resultQuery).toContain('OFFSET $3');
   });
 
   it('searches both SKU and product name using a bound parameter', async () => {
@@ -71,19 +72,19 @@ describe('InventoryService', () => {
       search: '  gown  ',
     });
 
-    const result = await service.listInventory(query);
+    const result = await service.listInventory('11111111-1111-4111-8111-111111111111', query);
 
     const countCall = dataSource.query.mock.calls[0];
     const resultCall = dataSource.query.mock.calls[1];
 
     // Both fields must be searched, and the input must not be interpolated
     // directly into SQL.
-    expect(countCall[0]).toContain('sku ILIKE $1');
-    expect(countCall[0]).toContain('product_name ILIKE $1');
-    expect(countCall[1]).toEqual(['%gown%']);
+    expect(countCall[0]).toContain('sku ILIKE $2');
+    expect(countCall[0]).toContain('product_name ILIKE $2');
+    expect(countCall[1]).toEqual(['11111111-1111-4111-8111-111111111111', '%gown%']);
 
     // The result query reuses the search parameter, followed by limit and offset.
-    expect(resultCall[1]).toEqual(['%gown%', 25, 0]);
+    expect(resultCall[1]).toEqual(['11111111-1111-4111-8111-111111111111', '%gown%', 25, 0]);
 
     // PostgreSQL numeric strings are normalized to JavaScript numbers.
     expect(result.data[0].initialStock).toBe(10);
@@ -101,7 +102,7 @@ describe('InventoryService', () => {
       stockStatus: 'low_stock' as const,
     });
 
-    const result = await service.listInventory(query);
+    const result = await service.listInventory('11111111-1111-4111-8111-111111111111', query);
 
     expect(dataSource.query.mock.calls[0][0]).toContain(
       'available_stock BETWEEN 1 AND 5',
@@ -124,7 +125,7 @@ describe('InventoryService', () => {
       stockStatus: 'out_of_stock' as const,
     });
 
-    const result = await service.listInventory(query);
+    const result = await service.listInventory('11111111-1111-4111-8111-111111111111', query);
 
     expect(dataSource.query.mock.calls[0][0]).toContain(
       'available_stock = 0',
@@ -146,7 +147,7 @@ describe('InventoryService', () => {
       stockStatus: 'in_stock' as const,
     });
 
-    await service.listInventory(query);
+    await service.listInventory('11111111-1111-4111-8111-111111111111', query);
 
     expect(dataSource.query.mock.calls[0][0]).toContain(
       'available_stock > 5',
@@ -163,6 +164,7 @@ describe('InventoryService', () => {
       .mockResolvedValueOnce([]);
 
     const result = await service.listInventory(
+      '11111111-1111-4111-8111-111111111111',
       new ListInventoryQueryDto(),
     );
 
@@ -194,6 +196,7 @@ describe('InventoryService', () => {
       ]);
 
     const result = await service.listInventory(
+      '11111111-1111-4111-8111-111111111111',
       new ListInventoryQueryDto(),
     );
 
@@ -212,10 +215,10 @@ describe('InventoryService', () => {
       limit: 10,
     });
 
-    const result = await service.listInventory(query);
+    const result = await service.listInventory('11111111-1111-4111-8111-111111111111', query);
 
     // Page 3 at 10 records per page starts after the first 20 records.
-    expect(dataSource.query.mock.calls[1][1]).toEqual([10, 20]);
+    expect(dataSource.query.mock.calls[1][1]).toEqual(['11111111-1111-4111-8111-111111111111', 10, 20]);
 
     expect(result.meta).toEqual({
       page: 3,
@@ -224,4 +227,27 @@ describe('InventoryService', () => {
       totalPages: 6,
     });
   });
+
+  it('scopes both inventory queries to the requested business', async () => {
+    const businessId = '11111111-1111-4111-8111-111111111111';
+
+    dataSource.query
+      .mockResolvedValueOnce([{ totalItems: 1 }])
+      .mockResolvedValueOnce([]);
+
+    await service.listInventory(
+      businessId,
+      new ListInventoryQueryDto(),
+    );
+
+    const countCall = dataSource.query.mock.calls[0];
+    const resultCall = dataSource.query.mock.calls[1];
+
+    expect(countCall[0]).toContain('business_id = $1');
+    expect(resultCall[0]).toContain('business_id = $1');
+
+    expect(countCall[1]).toEqual([businessId]);
+    expect(resultCall[1]).toEqual([businessId, 25, 0]);
+  });
+
 });

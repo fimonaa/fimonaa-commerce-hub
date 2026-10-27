@@ -5,19 +5,24 @@ import {
   Get,
   InternalServerErrorException,
   Post,
+  Req,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { readFile, stat } from 'node:fs/promises';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Roles } from '../auth/decorators/roles.decorator';
+import type { AuthenticatedRequest } from '../auth/types/authenticated-user.type';
 import { ExcelWorkbookReaderService } from './excel-workbook-reader.service';
+import { InventoryOpeningBalanceService } from './inventory-opening-balance.service';
 
 @Controller('inventory-import')
 export class InventoryImportController {
   constructor(
     private readonly configService: ConfigService,
     private readonly excelWorkbookReaderService: ExcelWorkbookReaderService,
+    private readonly inventoryOpeningBalanceService: InventoryOpeningBalanceService,
   ) { }
 
   @Get('validate-local')
@@ -209,10 +214,29 @@ export class InventoryImportController {
  *
  * Validation-only endpoints remain available.
  */
+  @Roles('owner', 'admin', 'inventory_manager')
   @Post('import-opening-balance')
-  importOpeningBalance(): never {
-    throw new ForbiddenException(
-      'Opening-balance imports are temporarily disabled until business authorization is implemented.',
+  async importOpeningBalance(@Req() request: AuthenticatedRequest) {
+    const businessId = request.user?.businessId;
+
+    if (!businessId) {
+      throw new ForbiddenException(
+        'An authenticated business context is required.',
+      );
+    }
+
+    const importEnabled =
+      this.configService.get<string>('ENABLE_OPENING_BALANCE_IMPORT') ===
+      'true';
+
+    if (!importEnabled) {
+      throw new ForbiddenException(
+        'Opening-balance imports are temporarily disabled until business authorization is implemented.',
+      );
+    }
+
+    return this.inventoryOpeningBalanceService.importOpeningBalance(
+      businessId,
     );
   }
 }
