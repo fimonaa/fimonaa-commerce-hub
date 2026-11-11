@@ -7,10 +7,19 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BusinessMembership } from './entities/business-membership.entity';
 import { Business } from './entities/business.entity';
 import { User } from './entities/user.entity';
+import { UserInvitation } from './entities/user-invitation.entity';
 import { AuthenticationGuard } from './guards/authentication.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { AuthenticationContextService } from './authentication-context.service';
 import { JwtVerificationService } from './jwt-verification.service';
+import { PasswordHashingService } from './password-hashing.service';
+import { AccessTokenService } from './access-token.service';
+import { CredentialVerificationService } from './credential-verification.service';
+import { LoginService } from './login.service';
+import { AuthController } from './auth.controller';
+import { InvitationTokenService } from './invitation-token.service';
+import { InvitationPersistenceService } from './invitation-persistence.service';
+import { InvitationAcceptanceService } from './invitation-acceptance.service';
 
 @Module({
   imports: [
@@ -32,10 +41,19 @@ import { JwtVerificationService } from './jwt-verification.service';
       User,
       Business,
       BusinessMembership,
+      UserInvitation,
     ]),
   ],
+  controllers: [AuthController],
   providers: [
     JwtVerificationService,
+    PasswordHashingService,
+    AccessTokenService,
+    CredentialVerificationService,
+    LoginService,
+    InvitationTokenService,
+    InvitationPersistenceService,
+    InvitationAcceptanceService,
     AuthenticationContextService,
     { provide: APP_GUARD, useClass: AuthenticationGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
