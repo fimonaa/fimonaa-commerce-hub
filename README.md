@@ -1,17 +1,21 @@
 # Fimonaa Commerce Hub
 
-Starter monorepo for Fimonaa's private commerce operations platform.
+Fimonaa Commerce Hub is an inventory-first, multi-business commerce operations platform under development for Fimonaa India, Fimonaa Finland, and potential future business workspaces.
 
-## Initial architecture
+**Status:** The backend includes authentication, business-scoped authorization, inventory listing, and guarded opening-balance import functionality. It is **not production-ready**. The Excel SKU workbook remains the inventory source of truth until an explicitly approved cutover.
 
-- `apps/api`: NestJS backend API
-- `apps/web`: Angular frontend placeholder and setup notes
-- `apps/worker`: background job worker placeholder
-- `libs/domain`: shared domain contracts
-- `infrastructure`: local PostgreSQL and Redis services
-- `docs`: integration setup notes
+## Repository layout
 
-This is a foundation scaffold, not yet a production-ready OMS. Shopify credentials and real OAuth/webhook handling must be configured and tested before using live data.
+| Path | Purpose |
+|---|---|
+| `apps/api` | NestJS and TypeScript backend API |
+| `apps/web` | React 19, TypeScript 6, Vite 8 and Tailwind CSS 4 frontend |
+| `apps/worker` | Background worker workspace |
+| `libs/domain` | Shared domain contracts |
+| `infrastructure` | Local PostgreSQL and Redis configuration |
+| `docs` | Development documentation, implementation notes, and architecture decisions |
+
+The frontend uses React 19, TypeScript 6, Vite 8 and Tailwind CSS 4. Start it from the repository root with `npm run dev -w apps/web` and build it with `npm run build -w apps/web`.
 
 ## Prerequisites
 
@@ -19,50 +23,109 @@ This is a foundation scaffold, not yet a production-ready OMS. Shopify credentia
 - npm
 - Docker Desktop
 
-## Start infrastructure
+## Local infrastructure
+
+From the repository root:
 
 ```bash
 docker compose -f infrastructure/docker-compose.yml up -d
 ```
 
-PostgreSQL is exposed locally on `localhost:5432`; Redis on `localhost:6379`.
+The initial local configuration exposes PostgreSQL on `localhost:5432` and Redis on `localhost:6379`. Confirm ports against the current Compose configuration if it has changed.
 
 ## Backend setup
 
+From the repository root, prepare the backend environment:
+
 ```bash
-cd apps/api
-cp .env.example .env
+cp apps/api/.env.example apps/api/.env
+```
+
+Review the database configuration before starting the API. Then run:
+
+```bash
 npm install
-npm run start:dev
+npm run dev:api
 ```
 
-The API listens on `http://localhost:3000`. Health check: `GET /health`.
+Review `.env.example` before starting. **The normal `DATABASE_URL` may point to the protected `fimonaa_commerce` database.** Confirm the target and use an appropriate development database. Starting the API does not authorize migrations, imports, seeds, or any writes to protected inventory.
 
-## Frontend setup
+The API uses the `/api` global prefix. Its documented authentication endpoints are:
 
-Create the Angular app using the current Angular CLI:
+| Method | Route | Access | Purpose |
+|---|---|---|---|
+| `POST` | `/api/auth/login` | Public | Verify credentials and issue a 15-minute JWT access token |
+| `POST` | `/api/auth/accept-invitation` | Public | Activate an invited account with a single-use invitation token |
+| `POST` | `/api/auth/invitations` | Authenticated owner or admin | Create an invitation for an existing invited user with membership in the selected business |
+
+Protected business routes use a bearer token and an `X-Business-Id` header. The backend verifies the user's active membership and role for the requested business; the header alone does not grant access.
+
+The application also provides business-scoped inventory listing and a protected opening-balance import endpoint. The import feature is disabled by default and its service is restricted to the isolated integration-test database.
+
+The backend health endpoint is `GET /api/health`. Swagger/OpenAPI documentation is documented at `/api/docs` outside production.
+
+## Authentication and authorization
+
+The merged authentication milestone includes:
+
+- Argon2id password hashing and credential verification.
+- Signed JWT access tokens with a 15-minute lifetime.
+- Database-backed business membership and role resolution.
+- Owner/admin invitation creation and transactional, single-use invitation acceptance.
+- SHA256-hashed invitation tokens in storage, with a 24-hour expiration.
+
+The current invitation flow requires an existing user with `invited` status and an existing business membership. It does not create new users or memberships. Refresh tokens, logout/revocation, password recovery, rate limiting, and secure invitation delivery remain pending.
+
+## Database and inventory safety
+
+**Protected database:** `fimonaa_commerce`
+
+**Isolated integration-test database:** `fimonaa_commerce_import_test`
+
+Do not run migrations, rollbacks, imports, seeds, destructive SQL, integration tests, or other database writes against the protected database without explicit authorization. TypeORM schema synchronization is disabled (`synchronize: false`).
+
+Six TypeORM migrations are implemented in the repository, including tenant-scoped SKU identifiers and user invitations. Their presence in source control does **not** confirm deployment to the protected database. Migration 5 and migration 6 require explicit deployment review; both refuse automatic rollback.
+
+The Excel SKU workbook remains authoritative. Live Shopify or marketplace stock writes, production opening-balance imports, and inventory cutover are not approved.
+
+## Verification
+
+The authentication implementation merged through PR #7 (`d1c25be`) recorded **151 passing unit tests** and **83 passing integration tests** (234 total). These are milestone results, not a claim of a fresh test run or production readiness.
+
+Non-database-writing build checks from the repository root:
 
 ```bash
-npx @angular/cli@latest new web --directory apps/web --routing --style=scss --standalone --skip-git
+npm run build:api
+npm run build -w apps/web
 ```
 
-Then add the dashboard modules described in `docs/IMPLEMENTATION_PLAN.md`.
+Additional TypeScript test compilation check from `apps/api`:
 
-## Shopify app setup
+```bash
+npx tsc --project tsconfig.test.json --noEmit
+```
 
-Use the Shopify Dev Dashboard to create the app. For local development, configure the app URL and OAuth callback only after the backend is running behind a stable HTTPS development tunnel. Never use a placeholder callback URL as a working URL.
+Integration tests require verified local `.env.test` and `TEST_DATABASE_URL` configuration targeting only `fimonaa_commerce_import_test`. Do not run them until the database safety checks have been confirmed.
 
-Initial candidate scopes to review:
-- `read_products`
-- `read_inventory`
-- `write_inventory`
-- `read_orders`
-- `read_locations`
+## Development status and next steps
 
-Confirm current Shopify API requirements and protected customer data access before requesting scopes. Store secrets only in backend environment variables or a secret manager.
+The inventory authorization milestone was merged through PR #6 (`d4e5296`), followed by authentication and invitations through PR #7 (`d1c25be`).
 
-## Important implementation notes
+Business membership management is the next engineering priority. Initial read-only service work is checkpointed on `feature/business-membership-management` at `47acd8e`, but its controller, module integration, and tests remain unfinished and unmerged.
 
-- Never put Shopify client secrets or access tokens in frontend code or source control.
-- Do not enable live stock writes until inventory reservation, idempotency and reconciliation tests pass.
-- Each marketplace connector must implement only capabilities documented and authorized for that seller account.
+Additional work includes authentication hardening, endpoint authorization audits, database deployment and recovery verification, controlled inventory operations, business onboarding, orders and returns, and integrations.
+
+## Shopify and marketplace integration
+
+Shopify OAuth, webhook handling, and live integration credentials must be configured and tested before use. Review required scopes and permissions against the actual integration design; do not treat the scaffold's proposed scopes as approved. Keep client secrets and access tokens out of frontend code and Git.
+
+Live stock writes require an approved design for inventory reservations, idempotency, reconciliation, and operational recovery. Marketplace connectors must use only capabilities authorized for the relevant seller account.
+
+## Documentation
+
+- `docs/development-documentation_v1.4.md`: current implementation and development checkpoint.
+- `docs/architecture/decisions/ADR-001-inventory-source-of-truth.md`: Excel authority and controlled cutover.
+- `docs/architecture/decisions/ADR-002-tenant-scoped-sku-identifiers.md`: tenant-scoped inventory identity.
+- `docs/architecture/decisions/ADR-003-authentication-and-business-authorization.md`: authentication, invitations, and authorization decisions (documentation branch; pending merge).
+
+Earlier development-documentation versions remain historical records.
