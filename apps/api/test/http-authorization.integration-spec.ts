@@ -518,6 +518,59 @@ describe('HTTP authentication and authorization integration', () => {
     }
   });
 
+  it('revokes access immediately when a user is disabled after JWT issuance', async () => {
+    const userId = randomUUID();
+    const businessId = randomUUID();
+
+    try {
+      await dataSource.query(
+        `INSERT INTO users (id, email, status)
+         VALUES ($1, $2, 'active')`,
+        [userId, `http-test-${userId}@example.invalid`],
+      );
+
+      await dataSource.query(
+        `INSERT INTO businesses (id, name, slug, status)
+         VALUES ($1, $2, $3, 'active')`,
+        [businessId, 'Account Deactivation Test', `http-test-${businessId}`],
+      );
+
+      await dataSource.query(
+        `INSERT INTO business_memberships (business_id, user_id, role)
+         VALUES ($1, $2, 'owner')`,
+        [businessId, userId],
+      );
+
+      const token = await createTestJwt(userId);
+
+      await request(app.getHttpServer())
+        .get('/api/inventory')
+        .set('Authorization', `Bearer ${token}`)
+        .set('X-Business-Id', businessId)
+        .expect(200);
+
+      await dataSource.query(
+        `UPDATE users SET status = 'disabled' WHERE id = $1`,
+        [userId],
+      );
+
+      const response = await request(app.getHttpServer())
+        .get('/api/inventory')
+        .set('Authorization', `Bearer ${token}`)
+        .set('X-Business-Id', businessId)
+        .expect(401);
+
+      expect(response.body.message).toBe('User is not active');
+    } finally {
+      await dataSource.query(
+        'DELETE FROM business_memberships WHERE user_id = $1 AND business_id = $2',
+        [userId, businessId],
+      );
+      await dataSource.query('DELETE FROM users WHERE id = $1', [userId]);
+      await dataSource.query('DELETE FROM businesses WHERE id = $1', [businessId]);
+    }
+  });
+
   it('rejects suspended businesses despite valid owner membership', async () => {
     const userId = randomUUID();
     const businessId = randomUUID();

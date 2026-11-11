@@ -15,7 +15,8 @@
     "migration:show": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:show",
     "migration:run": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:run",
     "migration:revert": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:revert",
-    "seed:businesses": "ts-node src/database/seed-businesses.ts"
+    "seed:businesses": "ts-node src/database/seed-businesses.ts",
+    "test:integration": "jest --config jest.integration.config.ts --runInBand"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
@@ -25,6 +26,7 @@
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/swagger": "^11.4.7",
     "@nestjs/typeorm": "^11.0.3",
+    "argon2": "^0.45.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "pg": "^8.23.1",
