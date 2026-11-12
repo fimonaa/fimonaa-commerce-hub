@@ -7,6 +7,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { HealthModule } from './health/health.module';
 import { ImportsModule } from './imports/imports.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { BusinessMembershipsModule } from './business-memberships/business-memberships.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { InventoryModule } from './inventory/inventory.module';
     DashboardModule,
     ImportsModule,
     InventoryModule,
+    BusinessMembershipsModule,
   ],
 })
 export class AppModule {}
