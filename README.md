@@ -2,7 +2,7 @@
 
 Fimonaa Commerce Hub is an inventory-first, multi-business commerce operations platform under development for Fimonaa India, Fimonaa Finland, and potential future business workspaces.
 
-**Status:** The backend includes authentication, business-scoped authorization, inventory listing, and guarded opening-balance import functionality. It is **not production-ready**. The Excel SKU workbook remains the inventory source of truth until an explicitly approved cutover.
+**Status:** The backend includes authentication, invitations, business-scoped authorization, inventory listing, read-only business membership management, and guarded opening-balance import functionality. It is **not production-ready**. The Excel SKU workbook remains the inventory source of truth until an explicitly approved cutover.
 
 ## Repository layout
 
@@ -60,7 +60,16 @@ The API uses the `/api` global prefix. Its documented authentication endpoints a
 
 Protected business routes use a bearer token and an `X-Business-Id` header. The backend verifies the user's active membership and role for the requested business; the header alone does not grant access.
 
-The application also provides business-scoped inventory listing and a protected opening-balance import endpoint. The import feature is disabled by default and its service is restricted to the isolated integration-test database.
+The application also provides business-scoped inventory listing and a protected opening-balance import endpoint.
+
+Read-only business membership management was merged through PR #9 (`5de2992`):
+
+| Method | Route | Access | Response |
+|---|---|---|---|
+| `GET` | `/api/business-memberships` | Authenticated owner or admin | `{ "items": BusinessMember[] }` |
+| `GET` | `/api/business-memberships/:membershipId` | Authenticated owner or admin | `BusinessMember` or `404` |
+
+The membership identifier must be a UUID. Both routes use the verified `X-Business-Id` context. The response contains `id`, `userId`, `email`, `status`, `role`, and `createdAt`; sensitive user fields are excluded. These endpoints do not create, modify, or remove memberships. Invalid membership UUIDs return `400`; missing or invalid authentication returns `401`; insufficient role permissions return `403`; and unknown or cross-business membership IDs return `404`. The import feature is disabled by default and its service is restricted to the isolated integration-test database.
 
 The backend health endpoint is `GET /api/health`. Swagger/OpenAPI documentation is documented at `/api/docs` outside production.
 
@@ -90,7 +99,7 @@ The Excel SKU workbook remains authoritative. Live Shopify or marketplace stock 
 
 ## Verification
 
-The authentication implementation merged through PR #7 (`d1c25be`) recorded **151 passing unit tests** and **83 passing integration tests** (234 total). These are milestone results, not a claim of a fresh test run or production readiness.
+The read-only membership milestone merged through PR #9 (`5de2992`) recorded **163 passing unit tests across 23 suites** and **96 passing integration tests across 11 suites** (**259 total**). The milestone added 12 membership unit tests and 13 membership HTTP integration tests. TypeScript compilation, ESLint, API build, and two GitHub CI checks passed. These are recorded milestone results, not a claim of a fresh test run or production readiness.
 
 Non-database-writing build checks from the repository root:
 
@@ -109,9 +118,9 @@ Integration tests require verified local `.env.test` and `TEST_DATABASE_URL` con
 
 ## Development status and next steps
 
-The inventory authorization milestone was merged through PR #6 (`d4e5296`), followed by authentication and invitations through PR #7 (`d1c25be`).
+The inventory authorization milestone merged through PR #6 (`d4e5296`), authentication and invitations through PR #7 (`d1c25be`), v1.4 documentation through PR #8 (`537bc9f`), and read-only business membership management through PR #9 (`5de2992`).
 
-Business membership management is the next engineering priority. Initial read-only service work is checkpointed on `feature/business-membership-management` at `47acd8e`, but its controller, module integration, and tests remain unfinished and unmerged.
+Business membership management Phase 1 is complete. Membership creation, provisioning, role updates, removal, and last-active-owner safeguards remain pending. These mutating operations require separate design and testing.
 
 Additional work includes authentication hardening, endpoint authorization audits, database deployment and recovery verification, controlled inventory operations, business onboarding, orders and returns, and integrations.
 
@@ -123,9 +132,9 @@ Live stock writes require an approved design for inventory reservations, idempot
 
 ## Documentation
 
-- `docs/development-documentation_v1.4.md`: current implementation and development checkpoint.
+- `docs/development-documentation_v1.5.md`: latest implementation and development checkpoint. Earlier versions, including v1.4, remain historical records.
 - `docs/architecture/decisions/ADR-001-inventory-source-of-truth.md`: Excel authority and controlled cutover.
 - `docs/architecture/decisions/ADR-002-tenant-scoped-sku-identifiers.md`: tenant-scoped inventory identity.
-- `docs/architecture/decisions/ADR-003-authentication-and-business-authorization.md`: authentication, invitations, and authorization decisions (documentation branch; pending merge).
+- `docs/architecture/decisions/ADR-003-authentication-and-business-authorization.md`: authentication, invitations, and authorization decisions (merged through PR #8).
 
 Earlier development-documentation versions remain historical records.
