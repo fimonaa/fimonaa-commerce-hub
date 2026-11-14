@@ -98,6 +98,7 @@ describe('InvitationPersistenceService', () => {
       where: {
         userId,
         businessId,
+        status: 'active',
       },
     });
 
@@ -191,6 +192,7 @@ describe('InvitationPersistenceService', () => {
       where: {
         userId,
         businessId,
+        status: 'active',
       },
     });
 

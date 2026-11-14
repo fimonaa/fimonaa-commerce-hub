@@ -1,4 +1,8 @@
-import type { BusinessRole } from '../../auth/entities/business-membership.entity';
+import type {
+  BusinessRole,
+  BusinessMembershipStatus,
+} from '../../auth/entities/business-membership.entity';
+
 import type { UserStatus } from '../../auth/entities/user.entity';
 
 export interface BusinessMember {
@@ -6,6 +10,7 @@ export interface BusinessMember {
   userId: string;
   email: string;
   status: UserStatus;
+  membershipStatus: BusinessMembershipStatus;
   role: BusinessRole;
   createdAt: Date;
 }

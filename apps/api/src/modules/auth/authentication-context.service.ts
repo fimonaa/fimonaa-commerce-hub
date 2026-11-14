@@ -48,6 +48,7 @@ export class AuthenticationContextService {
     const membership = await this.memberships.findOneBy({
       userId,
       businessId,
+      status: 'active',
     });
 
     if (!membership) {

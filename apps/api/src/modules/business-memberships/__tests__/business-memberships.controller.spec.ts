@@ -70,6 +70,7 @@ describe('BusinessMembershipsController', () => {
       userId: '550e8400-e29b-41d4-a716-446655440000',
       email: 'member@example.com',
       status: 'active' as const,
+      membershipStatus: 'active' as const,
       role: 'admin' as const,
       createdAt: new Date('2026-11-01T10:00:00.000Z'),
     };

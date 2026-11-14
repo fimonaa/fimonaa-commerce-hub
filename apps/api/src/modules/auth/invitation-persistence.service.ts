@@ -58,6 +58,7 @@ export class InvitationPersistenceService {
         where: {
           userId,
           businessId,
+          status: 'active',
         },
       });
 

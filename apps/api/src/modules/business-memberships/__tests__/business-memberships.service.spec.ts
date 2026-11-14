@@ -16,7 +16,10 @@ describe('BusinessMembershipsService', () => {
     businessId,
     userId,
     role: 'admin',
+    status: 'active',
     createdAt,
+    updatedAt: createdAt,
+    removedAt: null,
   };
 
   const user: User = {
@@ -91,6 +94,7 @@ describe('BusinessMembershipsService', () => {
           email: user.email,
           status: 'active',
           role: 'admin',
+          membershipStatus: 'active',
           createdAt,
         },
       ],
@@ -127,6 +131,7 @@ describe('BusinessMembershipsService', () => {
       userId,
       email: user.email,
       status: 'active',
+      membershipStatus: 'active',
       role: 'admin',
       createdAt,
     });

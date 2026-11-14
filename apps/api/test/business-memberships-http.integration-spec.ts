@@ -229,10 +229,13 @@ describe('Business memberships HTTP integration', () => {
             'createdAt',
             'email',
             'id',
+            'membershipStatus',
             'role',
             'status',
             'userId',
         ]);
+
+        expect(response.body.membershipStatus).toBe('active');
 
         expect(response.body).not.toHaveProperty('passwordHash');
         expect(response.body).not.toHaveProperty('password_hash');
@@ -345,5 +348,251 @@ describe('Business memberships HTTP integration', () => {
             .set('Authorization', `Bearer ${token}`)
             .set('X-Business-Id', unauthorizedBusinessId)
             .expect(401);
+    });
+
+    describe('membership lifecycle authorization', () => {
+        const membershipStatuses = [
+            'pending',
+            'suspended',
+            'removed',
+        ] as const;
+
+        it.each(membershipStatuses)(
+            'denies access when membership is %s',
+            async (membershipStatus) => {
+                const token = await createTestJwt(userId);
+
+                try {
+                    await dataSource.query(
+                        `UPDATE business_memberships
+                     SET status = $1,
+                         updated_at = NOW()
+                     WHERE id = $2`,
+                        [membershipStatus, membershipAId],
+                    );
+
+                    await request(app.getHttpServer())
+                        .get('/api/business-memberships')
+                        .set('Authorization', `Bearer ${token}`)
+                        .set('X-Business-Id', businessAId)
+                        .expect(401);
+
+                    await request(app.getHttpServer())
+                        .get(`/api/business-memberships/${membershipAId}`)
+                        .set('Authorization', `Bearer ${token}`)
+                        .set('X-Business-Id', businessAId)
+                        .expect(401);
+                } finally {
+                    await dataSource.query(
+                        `UPDATE business_memberships
+                     SET status = 'active',
+                         removed_at = NULL,
+                         updated_at = NOW()
+                     WHERE id = $1`,
+                        [membershipAId],
+                    );
+                }
+            },
+        );
+
+        it('revokes access for an existing JWT after suspension', async () => {
+            const token = await createTestJwt(userId);
+
+            try {
+                await request(app.getHttpServer())
+                    .get('/api/business-memberships')
+                    .set('Authorization', `Bearer ${token}`)
+                    .set('X-Business-Id', businessAId)
+                    .expect(200);
+
+                await dataSource.query(
+                    `UPDATE business_memberships
+                 SET status = 'suspended',
+                     updated_at = NOW()
+                 WHERE id = $1`,
+                    [membershipAId],
+                );
+
+                await request(app.getHttpServer())
+                    .get('/api/business-memberships')
+                    .set('Authorization', `Bearer ${token}`)
+                    .set('X-Business-Id', businessAId)
+                    .expect(401);
+            } finally {
+                await dataSource.query(
+                    `UPDATE business_memberships
+                 SET status = 'active',
+                     updated_at = NOW()
+                 WHERE id = $1`,
+                    [membershipAId],
+                );
+            }
+        });
+
+        it('preserves access to another active business', async () => {
+            const token = await createTestJwt(userId);
+
+            try {
+                await dataSource.query(
+                    `UPDATE business_memberships
+                 SET status = 'suspended',
+                     updated_at = NOW()
+                 WHERE id = $1`,
+                    [membershipAId],
+                );
+
+                await request(app.getHttpServer())
+                    .get('/api/business-memberships')
+                    .set('Authorization', `Bearer ${token}`)
+                    .set('X-Business-Id', businessAId)
+                    .expect(401);
+
+                await request(app.getHttpServer())
+                    .get('/api/business-memberships')
+                    .set('Authorization', `Bearer ${token}`)
+                    .set('X-Business-Id', businessBId)
+                    .expect(200);
+            } finally {
+                await dataSource.query(
+                    `UPDATE business_memberships
+                 SET status = 'active',
+                     updated_at = NOW()
+                 WHERE id = $1`,
+                    [membershipAId],
+                );
+            }
+        });
+
+        it('does not change the global user status', async () => {
+            try {
+                await dataSource.query(
+                    `UPDATE business_memberships
+                 SET status = 'suspended',
+                     updated_at = NOW()
+                 WHERE id = $1`,
+                    [membershipAId],
+                );
+
+                const rows: Array<{ status: string }> =
+                    await dataSource.query(
+                        `SELECT status
+                     FROM users
+                     WHERE id = $1`,
+                        [userId],
+                    );
+
+                expect(rows).toHaveLength(1);
+                expect(rows[0].status).toBe('active');
+            } finally {
+                await dataSource.query(
+                    `UPDATE business_memberships
+                 SET status = 'active',
+                     updated_at = NOW()
+                 WHERE id = $1`,
+                    [membershipAId],
+                );
+            }
+        });
+
+        it.each(['pending', 'suspended', 'removed'] as const)(
+            'allows an active owner to view a %s membership',
+            async (membershipStatus) => {
+                const memberUserId = randomUUID();
+                const ownerToken = await createTestJwt(userId);
+                const memberToken = await createTestJwt(memberUserId);
+
+                await assertTestDatabase();
+
+                try {
+                    const inserted: Array<{ id: string }> =
+                        await dataSource.transaction(async (manager) => {
+                            await manager.query(
+                                `INSERT INTO users (id, email, status)
+                         VALUES ($1, $2, 'active')`,
+                                [
+                                    memberUserId,
+                                    `membership-lifecycle-${memberUserId}@example.invalid`,
+                                ],
+                            );
+
+                            return manager.query(
+                                `INSERT INTO business_memberships
+                            (business_id, user_id, role, status)
+                         VALUES ($1, $2, 'viewer', $3)
+                         RETURNING id`,
+                                [businessAId, memberUserId, membershipStatus],
+                            );
+                        });
+
+                    const memberMembershipId = inserted[0].id;
+
+                    // The active owner can see the inactive membership.
+                    const listResponse = await request(app.getHttpServer())
+                        .get('/api/business-memberships')
+                        .set('Authorization', `Bearer ${ownerToken}`)
+                        .set('X-Business-Id', businessAId)
+                        .expect(200);
+
+                    expect(listResponse.body.items).toEqual(
+                        expect.arrayContaining([
+                            expect.objectContaining({
+                                id: memberMembershipId,
+                                userId: memberUserId,
+                                role: 'viewer',
+                                status: 'active',
+                                membershipStatus,
+                            }),
+                        ]),
+                    );
+
+                    // The active owner can inspect the membership details.
+                    const detailResponse = await request(app.getHttpServer())
+                        .get(`/api/business-memberships/${memberMembershipId}`)
+                        .set('Authorization', `Bearer ${ownerToken}`)
+                        .set('X-Business-Id', businessAId)
+                        .expect(200);
+
+                    expect(detailResponse.body).toMatchObject({
+                        id: memberMembershipId,
+                        userId: memberUserId,
+                        role: 'viewer',
+                        status: 'active',
+                        membershipStatus,
+                    });
+
+                    // The inactive member cannot access the business.
+                    await request(app.getHttpServer())
+                        .get('/api/business-memberships')
+                        .set('Authorization', `Bearer ${memberToken}`)
+                        .set('X-Business-Id', businessAId)
+                        .expect(401);
+
+                    // Membership status does not change global account status.
+                    const users: Array<{ status: string }> =
+                        await dataSource.query(
+                            `SELECT status FROM users WHERE id = $1`,
+                            [memberUserId],
+                        );
+
+                    expect(users).toHaveLength(1);
+                    expect(users[0].status).toBe('active');
+                } finally {
+                    await assertTestDatabase();
+
+                    await dataSource.transaction(async (manager) => {
+                        await manager.query(
+                            `DELETE FROM business_memberships
+                     WHERE business_id = $1 AND user_id = $2`,
+                            [businessAId, memberUserId],
+                        );
+
+                        await manager.query(
+                            `DELETE FROM users WHERE id = $1`,
+                            [memberUserId],
+                        );
+                    });
+                }
+            },
+        );
     });
 });

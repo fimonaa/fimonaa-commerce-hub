@@ -45,6 +45,7 @@ describe('AuthenticationContextService', () => {
       userId,
       businessId,
       role: 'inventory_manager',
+      status: 'active',
     });
   });
 
@@ -68,6 +69,7 @@ describe('AuthenticationContextService', () => {
     expect(memberships.findOneBy).toHaveBeenCalledWith({
       userId,
       businessId,
+      status: 'active',
     });
   });
 
@@ -107,5 +109,19 @@ describe('AuthenticationContextService', () => {
     expect(users.findOneBy).not.toHaveBeenCalled();
     expect(businesses.findOneBy).not.toHaveBeenCalled();
     expect(memberships.findOneBy).not.toHaveBeenCalled();
+  });
+
+  it('rejects requests without an active business membership', async () => {
+    memberships.findOneBy.mockResolvedValue(null);
+
+    await expect(
+      service.resolve(userId, businessId),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(memberships.findOneBy).toHaveBeenCalledWith({
+      userId,
+      businessId,
+      status: 'active',
+    });
   });
 });
