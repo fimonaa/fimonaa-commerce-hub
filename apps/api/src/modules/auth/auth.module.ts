@@ -20,6 +20,7 @@ import { AuthController } from './auth.controller';
 import { InvitationTokenService } from './invitation-token.service';
 import { InvitationPersistenceService } from './invitation-persistence.service';
 import { InvitationAcceptanceService } from './invitation-acceptance.service';
+import { BusinessMembershipInvitation } from './entities/business-membership-invitation.entity';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { InvitationAcceptanceService } from './invitation-acceptance.service';
       Business,
       BusinessMembership,
       UserInvitation,
+      BusinessMembershipInvitation
     ]),
   ],
   controllers: [AuthController],

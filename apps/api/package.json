@@ -15,6 +15,7 @@
     "migration:show": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:show",
     "migration:run": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:run",
     "migration:revert": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:revert",
+    "migration:test": "ts-node test/run-test-migrations.ts",
     "seed:businesses": "ts-node src/database/seed-businesses.ts",
     "test:integration": "jest --config jest.integration.config.ts --runInBand"
   },
