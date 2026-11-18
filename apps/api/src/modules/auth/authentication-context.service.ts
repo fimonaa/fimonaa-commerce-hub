@@ -1,12 +1,12 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { validate as isUuid } from 'uuid';
-import { Repository } from 'typeorm';
+import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { validate as isUuid } from "uuid";
+import { Repository } from "typeorm";
 
-import { BusinessMembership } from './entities/business-membership.entity';
-import { Business } from './entities/business.entity';
-import { User } from './entities/user.entity';
-import type { AuthenticatedUser } from './types/authenticated-user.type';
+import { BusinessMembership } from "./entities/business-membership.entity";
+import { Business } from "./entities/business.entity";
+import { User } from "./entities/user.entity";
+import type { AuthenticatedUser } from "./types/authenticated-user.type";
 
 @Injectable()
 export class AuthenticationContextService {
@@ -19,40 +19,65 @@ export class AuthenticationContextService {
     private readonly memberships: Repository<BusinessMembership>,
   ) {}
 
+  /**
+   * Verifies an active user without requiring business membership.
+   *
+   * Used only for operations such as accepting an invitation
+   * to join a business.
+   */
+  async resolveIdentity(userId: string): Promise<{ userId: string }> {
+    if (!isUuid(userId)) {
+      throw new UnauthorizedException("Invalid authentication context");
+    }
+
+    const user = await this.users.findOneBy({
+      id: userId,
+      status: "active",
+    });
+
+    if (!user) {
+      throw new UnauthorizedException("User is not active");
+    }
+
+    return {
+      userId: user.id,
+    };
+  }
+
   async resolve(
     userId: string,
     businessId: string,
   ): Promise<AuthenticatedUser> {
     if (!isUuid(userId) || !isUuid(businessId)) {
-      throw new UnauthorizedException('Invalid authentication context');
+      throw new UnauthorizedException("Invalid authentication context");
     }
 
     const user = await this.users.findOneBy({
       id: userId,
-      status: 'active',
+      status: "active",
     });
 
     if (!user) {
-      throw new UnauthorizedException('User is not active');
+      throw new UnauthorizedException("User is not active");
     }
 
     const business = await this.businesses.findOneBy({
       id: businessId,
-      status: 'active',
+      status: "active",
     });
 
     if (!business) {
-      throw new UnauthorizedException('Business is not active');
+      throw new UnauthorizedException("Business is not active");
     }
 
     const membership = await this.memberships.findOneBy({
       userId,
       businessId,
-      status: 'active',
+      status: "active",
     });
 
     if (!membership) {
-      throw new UnauthorizedException('Business membership required');
+      throw new UnauthorizedException("Business membership required");
     }
 
     return {

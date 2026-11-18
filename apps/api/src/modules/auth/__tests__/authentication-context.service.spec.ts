@@ -124,4 +124,43 @@ describe('AuthenticationContextService', () => {
       status: 'active',
     });
   });
+
+  describe('resolveIdentity', () => {
+    it('allows an active user without checking business membership', async () => {
+      users.findOneBy.mockResolvedValue({
+        id: userId,
+        status: 'active',
+      } as User);
+
+      await expect(
+        service.resolveIdentity(userId),
+      ).resolves.toEqual({
+        userId,
+      });
+
+      expect(users.findOneBy).toHaveBeenCalledWith({
+        id: userId,
+        status: 'active',
+      });
+
+      expect(businesses.findOneBy).not.toHaveBeenCalled();
+      expect(memberships.findOneBy).not.toHaveBeenCalled();
+    });
+
+    it('rejects users without an active account', async () => {
+      users.findOneBy.mockResolvedValue(null);
+
+      await expect(
+        service.resolveIdentity(userId),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('rejects invalid user identifiers', async () => {
+      await expect(
+        service.resolveIdentity('invalid-user-id'),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(users.findOneBy).not.toHaveBeenCalled();
+    });
+  });
 });
