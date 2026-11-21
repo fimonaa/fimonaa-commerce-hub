@@ -20,6 +20,11 @@ import {
   type CreatedInvitation,
 } from './invitation-persistence.service';
 import type { AuthenticatedRequest } from './types/authenticated-user.type';
+import { CreateBusinessMembershipInvitationDto } from './dto/create-business-membership-invitation.dto';
+import {
+  BusinessMembershipInvitationIssuanceService,
+  type CreatedBusinessMembershipInvitation,
+} from './business-membership-invitation-issuance.service';
 
 @Controller('auth')
 export class AuthController {
@@ -27,6 +32,7 @@ export class AuthController {
     private readonly loginService: LoginService,
     private readonly invitationAcceptanceService: InvitationAcceptanceService,
     private readonly invitationPersistenceService: InvitationPersistenceService,
+    private readonly businessMembershipInvitationIssuanceService: BusinessMembershipInvitationIssuanceService,
   ) {}
 
   /**
@@ -80,6 +86,29 @@ export class AuthController {
     return this.invitationPersistenceService.create(
       request.userId,
       authenticatedRequest.user.businessId,
+    );
+  }
+
+  /**
+   * POST /api/auth/business-membership-invitations
+   *
+   * Requires authentication and owner or admin permissions.
+   * Both the business ID and inviter user ID are obtained from the
+   * authenticated request context, never from client-provided data.
+   */
+  @Post('business-membership-invitations')
+  @Roles('owner', 'admin')
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(HttpStatus.CREATED)
+  createBusinessMembershipInvitation(
+    @Body() request: CreateBusinessMembershipInvitationDto,
+    @Req() authenticatedRequest: AuthenticatedRequest,
+  ): Promise<CreatedBusinessMembershipInvitation> {
+    return this.businessMembershipInvitationIssuanceService.create(
+      authenticatedRequest.user.businessId,
+      authenticatedRequest.user.userId,
+      request.email,
+      request.role,
     );
   }
 }

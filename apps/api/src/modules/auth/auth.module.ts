@@ -21,6 +21,7 @@ import { InvitationTokenService } from './invitation-token.service';
 import { InvitationPersistenceService } from './invitation-persistence.service';
 import { InvitationAcceptanceService } from './invitation-acceptance.service';
 import { BusinessMembershipInvitation } from './entities/business-membership-invitation.entity';
+import { BusinessMembershipInvitationIssuanceService } from './business-membership-invitation-issuance.service';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { BusinessMembershipInvitation } from './entities/business-membership-inv
     InvitationTokenService,
     InvitationPersistenceService,
     InvitationAcceptanceService,
+    BusinessMembershipInvitationIssuanceService,
     AuthenticationContextService,
     { provide: APP_GUARD, useClass: AuthenticationGuard },
     { provide: APP_GUARD, useClass: RolesGuard },

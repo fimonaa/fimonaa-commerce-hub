@@ -2,11 +2,13 @@ import { InvitationPersistenceService } from '../invitation-persistence.service'
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { HTTP_CODE_METADATA, ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
-
+import { ROLES_KEY } from '../decorators/roles.decorator';
+import { AuthenticatedRequest } from '../types/authenticated-user.type';
 import { AuthController } from '../auth.controller';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { LoginService } from '../login.service';
 import { InvitationAcceptanceService } from '../invitation-acceptance.service';
+import { BusinessMembershipInvitationIssuanceService } from '../business-membership-invitation-issuance.service';
 
 describe('AuthController', () => {
   const loginResult = {
@@ -20,6 +22,9 @@ describe('AuthController', () => {
   let invitationAcceptanceService: jest.Mocked<
     Pick<InvitationAcceptanceService, 'accept'>
   >;
+  let businessMembershipInvitationIssuanceService: jest.Mocked<
+    Pick<BusinessMembershipInvitationIssuanceService, 'create'>
+  >;
 
   beforeEach(() => {
     loginService = {
@@ -29,6 +34,9 @@ describe('AuthController', () => {
     invitationAcceptanceService = {
       accept: jest.fn(),
     };
+    businessMembershipInvitationIssuanceService = {
+      create: jest.fn(),
+    };
 
     controller = new AuthController(
       loginService as unknown as LoginService,
@@ -36,6 +44,7 @@ describe('AuthController', () => {
       {
         createInvitation: jest.fn(),
       } as unknown as InvitationPersistenceService,
+      businessMembershipInvitationIssuanceService as unknown as BusinessMembershipInvitationIssuanceService,
     );
   });
 
@@ -144,5 +153,113 @@ describe('AuthController', () => {
     expect(
       Reflect.getMetadata(ROUTE_ARGS_METADATA, AuthController, 'login'),
     ).toBeDefined();
+  });
+
+  it('uses authenticated business and user IDs when issuing a membership invitation', async () => {
+    const request = {
+      email: 'employee@example.com',
+      role: 'operator' as const,
+    };
+
+    const authenticatedRequest = {
+      user: {
+        userId: '11111111-1111-4111-8111-111111111111',
+        businessId: '22222222-2222-4222-8222-222222222222',
+        role: 'admin',
+      },
+    } as AuthenticatedRequest;
+
+    const result = {
+      invitationId: '33333333-3333-4333-8333-333333333333',
+      businessId: authenticatedRequest.user.businessId,
+      invitedEmail: request.email,
+      role: request.role,
+      expiresAt: new Date('2026-11-22T12:00:00.000Z'),
+      token: 'secure-invitation-token',
+    };
+
+    businessMembershipInvitationIssuanceService.create.mockResolvedValue(
+      result,
+    );
+
+    await expect(
+      controller.createBusinessMembershipInvitation(
+        request,
+        authenticatedRequest,
+      ),
+    ).resolves.toEqual(result);
+
+    expect(
+      businessMembershipInvitationIssuanceService.create,
+    ).toHaveBeenCalledTimes(1);
+
+    expect(
+      businessMembershipInvitationIssuanceService.create,
+    ).toHaveBeenCalledWith(
+      authenticatedRequest.user.businessId,
+      authenticatedRequest.user.userId,
+      request.email,
+      request.role,
+    );
+  });
+
+  it('requires owner or admin permissions for membership invitations', () => {
+    const handler = controller.createBusinessMembershipInvitation;
+
+    expect(
+      Reflect.getMetadata(ROLES_KEY, handler),
+    ).toEqual(['owner', 'admin']);
+
+    expect(
+      Reflect.getMetadata(IS_PUBLIC_KEY, handler),
+    ).not.toBe(true);
+  });
+
+  it('declares the membership invitation endpoint with HTTP 201', () => {
+    const handler = controller.createBusinessMembershipInvitation;
+
+    expect(
+      Reflect.getMetadata(PATH_METADATA, handler),
+    ).toBe('business-membership-invitations');
+
+    expect(
+      Reflect.getMetadata(METHOD_METADATA, handler),
+    ).toBe(1);
+
+    expect(
+      Reflect.getMetadata(HTTP_CODE_METADATA, handler),
+    ).toBe(201);
+
+    expect(
+      Reflect.getMetadata(
+        ROUTE_ARGS_METADATA,
+        AuthController,
+        'createBusinessMembershipInvitation',
+      ),
+    ).toBeDefined();
+  });
+
+  it('propagates membership invitation issuance errors', async () => {
+    const authenticatedRequest = {
+      user: {
+        userId: '11111111-1111-4111-8111-111111111111',
+        businessId: '22222222-2222-4222-8222-222222222222',
+        role: 'admin',
+      },
+    } as AuthenticatedRequest;
+
+    businessMembershipInvitationIssuanceService.create.mockRejectedValue(
+      new BadRequestException('Invitation could not be issued'),
+    );
+
+    await expect(
+      controller.createBusinessMembershipInvitation(
+        {
+          email: 'employee@example.com',
+          role: 'viewer',
+        },
+        authenticatedRequest,
+      ),
+    ).rejects.toThrow(BadRequestException);
   });
 });
