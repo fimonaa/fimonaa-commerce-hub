@@ -9,3 +9,9 @@ export interface AuthenticatedUser {
 export interface AuthenticatedRequest {
   user: AuthenticatedUser;
 }
+
+export interface IdentityAuthenticatedRequest {
+  user: {
+    userId: string;
+  };
+}

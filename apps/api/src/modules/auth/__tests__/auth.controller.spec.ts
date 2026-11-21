@@ -9,6 +9,9 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { LoginService } from '../login.service';
 import { InvitationAcceptanceService } from '../invitation-acceptance.service';
 import { BusinessMembershipInvitationIssuanceService } from '../business-membership-invitation-issuance.service';
+import { BusinessMembershipInvitationAcceptanceService } from '../business-membership-invitation-acceptance.service';
+import { IS_IDENTITY_ONLY_KEY } from '../decorators/identity-only.decorator';
+import type { IdentityAuthenticatedRequest } from '../types/authenticated-user.type';
 
 describe('AuthController', () => {
   const loginResult = {
@@ -25,6 +28,9 @@ describe('AuthController', () => {
   let businessMembershipInvitationIssuanceService: jest.Mocked<
     Pick<BusinessMembershipInvitationIssuanceService, 'create'>
   >;
+  let businessMembershipInvitationAcceptanceService: jest.Mocked<
+    Pick<BusinessMembershipInvitationAcceptanceService, 'accept'>
+  >;
 
   beforeEach(() => {
     loginService = {
@@ -37,6 +43,9 @@ describe('AuthController', () => {
     businessMembershipInvitationIssuanceService = {
       create: jest.fn(),
     };
+    businessMembershipInvitationAcceptanceService = {
+      accept: jest.fn(),
+    };
 
     controller = new AuthController(
       loginService as unknown as LoginService,
@@ -45,6 +54,7 @@ describe('AuthController', () => {
         createInvitation: jest.fn(),
       } as unknown as InvitationPersistenceService,
       businessMembershipInvitationIssuanceService as unknown as BusinessMembershipInvitationIssuanceService,
+      businessMembershipInvitationAcceptanceService as unknown as BusinessMembershipInvitationAcceptanceService,
     );
   });
 
@@ -258,6 +268,104 @@ describe('AuthController', () => {
           email: 'employee@example.com',
           role: 'viewer',
         },
+        authenticatedRequest,
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('accepts a business membership invitation using the authenticated user identity', async () => {
+    const authenticatedRequest: IdentityAuthenticatedRequest = {
+      user: {
+        userId: '11111111-1111-4111-8111-111111111111',
+      },
+    };
+
+    const token = 'A'.repeat(43);
+
+    const result = {
+      membershipId: '33333333-3333-4333-8333-333333333333',
+      businessId: '22222222-2222-4222-8222-222222222222',
+      role: 'operator' as const,
+      status: 'active' as const,
+    };
+
+    businessMembershipInvitationAcceptanceService.accept.mockResolvedValue(
+      result,
+    );
+
+    await expect(
+      controller.acceptBusinessMembershipInvitation(
+        { token },
+        authenticatedRequest,
+      ),
+    ).resolves.toEqual(result);
+
+    expect(
+      businessMembershipInvitationAcceptanceService.accept,
+    ).toHaveBeenCalledTimes(1);
+
+    expect(
+      businessMembershipInvitationAcceptanceService.accept,
+    ).toHaveBeenCalledWith(
+      token,
+      authenticatedRequest.user.userId,
+    );
+  });
+
+  it('requires identity-only authentication for membership invitation acceptance', () => {
+    const handler = controller.acceptBusinessMembershipInvitation;
+
+    expect(
+      Reflect.getMetadata(IS_IDENTITY_ONLY_KEY, handler),
+    ).toBe(true);
+
+    expect(
+      Reflect.getMetadata(IS_PUBLIC_KEY, handler),
+    ).not.toBe(true);
+
+    expect(
+      Reflect.getMetadata(ROLES_KEY, handler),
+    ).toBeUndefined();
+  });
+
+  it('declares the membership invitation acceptance endpoint with HTTP 201', () => {
+    const handler = controller.acceptBusinessMembershipInvitation;
+
+    expect(
+      Reflect.getMetadata(PATH_METADATA, handler),
+    ).toBe('business-membership-invitations/accept');
+
+    expect(
+      Reflect.getMetadata(METHOD_METADATA, handler),
+    ).toBe(1);
+
+    expect(
+      Reflect.getMetadata(HTTP_CODE_METADATA, handler),
+    ).toBe(201);
+
+    expect(
+      Reflect.getMetadata(
+        ROUTE_ARGS_METADATA,
+        AuthController,
+        'acceptBusinessMembershipInvitation',
+      ),
+    ).toBeDefined();
+  });
+
+  it('propagates business membership invitation acceptance errors', async () => {
+    const authenticatedRequest: IdentityAuthenticatedRequest = {
+      user: {
+        userId: '11111111-1111-4111-8111-111111111111',
+      },
+    };
+
+    businessMembershipInvitationAcceptanceService.accept.mockRejectedValue(
+      new BadRequestException('Invalid or expired membership invitation'),
+    );
+
+    await expect(
+      controller.acceptBusinessMembershipInvitation(
+        { token: 'A'.repeat(43) },
         authenticatedRequest,
       ),
     ).rejects.toThrow(BadRequestException);
