@@ -1,28 +1,46 @@
-import { UnauthorizedException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
+import { UnauthorizedException } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
 
-import { ROLES_KEY } from '../../auth/decorators/roles.decorator';
-import type { AuthenticatedRequest } from '../../auth/types/authenticated-user.type';
-import { BusinessMembershipsController } from '../business-memberships.controller';
-import { BusinessMembershipsService } from '../business-memberships.service';
+import { ROLES_KEY } from "../../auth/decorators/roles.decorator";
+import type { AuthenticatedRequest } from "../../auth/types/authenticated-user.type";
+import { BusinessMembershipsController } from "../business-memberships.controller";
+import { BusinessMembershipsService } from "../business-memberships.service";
+import { BusinessMembershipRoleManagementService } from "../business-membership-role-management.service";
+import { BusinessMembershipSuspensionService } from "../business-membership-suspension.service";
+import { BusinessMembershipReactivationService } from "../business-membership-reactivation.service";
+import { BusinessMembershipRemovalService } from "../business-membership-removal.service";
 
-describe('BusinessMembershipsController', () => {
-  const businessId = '550e8400-e29b-41d4-a716-446655440001';
-  const otherBusinessId = '550e8400-e29b-41d4-a716-446655440002';
-  const membershipId = '550e8400-e29b-41d4-a716-446655440003';
+describe("BusinessMembershipsController", () => {
+  const businessId = "550e8400-e29b-41d4-a716-446655440001";
+  const otherBusinessId = "550e8400-e29b-41d4-a716-446655440002";
+  const membershipId = "550e8400-e29b-41d4-a716-446655440003";
 
   let controller: BusinessMembershipsController;
   let service: jest.Mocked<
-    Pick<BusinessMembershipsService, 'listMembers' | 'getMember'>
+    Pick<BusinessMembershipsService, "listMembers" | "getMember">
   >;
 
-  const createRequest = (
-    selectedBusinessId: string,
-  ): AuthenticatedRequest => ({
+  let roleManagementService: jest.Mocked<
+    Pick<BusinessMembershipRoleManagementService, "updateRole">
+  >;
+
+  let suspensionService: jest.Mocked<
+    Pick<BusinessMembershipSuspensionService, "suspend">
+  >;
+
+  let reactivationService: jest.Mocked<
+    Pick<BusinessMembershipReactivationService, "reactivate">
+  >;
+
+  let removalService: jest.Mocked<
+    Pick<BusinessMembershipRemovalService, "remove">
+  >;
+
+  const createRequest = (selectedBusinessId: string): AuthenticatedRequest => ({
     user: {
-      userId: '550e8400-e29b-41d4-a716-446655440000',
+      userId: "550e8400-e29b-41d4-a716-446655440000",
       businessId: selectedBusinessId,
-      role: 'admin',
+      role: "admin",
     },
   });
 
@@ -31,13 +49,29 @@ describe('BusinessMembershipsController', () => {
       listMembers: jest.fn(),
       getMember: jest.fn(),
     };
+    roleManagementService = {
+      updateRole: jest.fn(),
+    };
+    suspensionService = {
+      suspend: jest.fn(),
+    };
+    reactivationService = {
+      reactivate: jest.fn(),
+    };
+    removalService = {
+      remove: jest.fn(),
+    };
 
     controller = new BusinessMembershipsController(
       service as unknown as BusinessMembershipsService,
+      roleManagementService as unknown as BusinessMembershipRoleManagementService,
+      suspensionService as unknown as BusinessMembershipSuspensionService,
+      reactivationService as unknown as BusinessMembershipReactivationService,
+      removalService as unknown as BusinessMembershipRemovalService,
     );
   });
 
-  it('passes the authenticated business ID to the list service', async () => {
+  it("passes the authenticated business ID to the list service", async () => {
     const expected = { items: [] };
     service.listMembers.mockResolvedValue(expected);
 
@@ -47,7 +81,7 @@ describe('BusinessMembershipsController', () => {
     expect(result).toEqual(expected);
   });
 
-  it('uses the selected authenticated business', async () => {
+  it("uses the selected authenticated business", async () => {
     service.listMembers.mockResolvedValue({ items: [] });
 
     await controller.listMembers(createRequest(otherBusinessId));
@@ -56,23 +90,23 @@ describe('BusinessMembershipsController', () => {
     expect(service.listMembers).not.toHaveBeenCalledWith(businessId);
   });
 
-  it('rejects listing without authenticated business context', () => {
-    expect(() =>
-      controller.listMembers({} as AuthenticatedRequest),
-    ).toThrow(UnauthorizedException);
+  it("rejects listing without authenticated business context", () => {
+    expect(() => controller.listMembers({} as AuthenticatedRequest)).toThrow(
+      UnauthorizedException,
+    );
 
     expect(service.listMembers).not.toHaveBeenCalled();
   });
 
-  it('passes business and membership IDs to the detail service', async () => {
+  it("passes business and membership IDs to the detail service", async () => {
     const expected = {
       id: membershipId,
-      userId: '550e8400-e29b-41d4-a716-446655440000',
-      email: 'member@example.com',
-      status: 'active' as const,
-      membershipStatus: 'active' as const,
-      role: 'admin' as const,
-      createdAt: new Date('2026-11-01T10:00:00.000Z'),
+      userId: "550e8400-e29b-41d4-a716-446655440000",
+      email: "member@example.com",
+      status: "active" as const,
+      membershipStatus: "active" as const,
+      role: "admin" as const,
+      createdAt: new Date("2026-11-01T10:00:00.000Z"),
     };
 
     service.getMember.mockResolvedValue(expected);
@@ -82,14 +116,11 @@ describe('BusinessMembershipsController', () => {
       membershipId,
     );
 
-    expect(service.getMember).toHaveBeenCalledWith(
-      businessId,
-      membershipId,
-    );
+    expect(service.getMember).toHaveBeenCalledWith(businessId, membershipId);
     expect(result).toEqual(expected);
   });
 
-  it('rejects member details without authenticated business context', () => {
+  it("rejects member details without authenticated business context", () => {
     expect(() =>
       controller.getMember({} as AuthenticatedRequest, membershipId),
     ).toThrow(UnauthorizedException);
@@ -97,7 +128,7 @@ describe('BusinessMembershipsController', () => {
     expect(service.getMember).not.toHaveBeenCalled();
   });
 
-  it('restricts the controller to owner and admin roles', () => {
+  it("restricts the controller to owner and admin roles", () => {
     const reflector = new Reflector();
 
     const roles = reflector.get<string[]>(
@@ -105,6 +136,284 @@ describe('BusinessMembershipsController', () => {
       BusinessMembershipsController,
     );
 
-    expect(roles).toEqual(['owner', 'admin']);
+    expect(roles).toEqual(["owner", "admin"]);
+  });
+
+  it("restricts role updates to owners", () => {
+    const reflector = new Reflector();
+
+    const roles = reflector.get<string[]>(
+      ROLES_KEY,
+      BusinessMembershipsController.prototype.updateRole,
+    );
+
+    expect(roles).toEqual(["owner"]);
+  });
+
+  it("passes authenticated context and requested role to the service", async () => {
+    const expected = {
+      id: membershipId,
+      userId: "550e8400-e29b-41d4-a716-446655440004",
+      role: "operator" as const,
+      membershipStatus: "active",
+    };
+
+    roleManagementService.updateRole.mockResolvedValue(expected);
+
+    const result = await controller.updateRole(
+      createRequest(businessId),
+      membershipId,
+      { role: "operator" },
+    );
+
+    expect(roleManagementService.updateRole).toHaveBeenCalledWith(
+      businessId,
+      "550e8400-e29b-41d4-a716-446655440000",
+      membershipId,
+      "operator",
+    );
+
+    expect(result).toEqual(expected);
+  });
+
+  it("rejects role updates without authenticated business context", () => {
+    expect(() =>
+      controller.updateRole({} as AuthenticatedRequest, membershipId, {
+        role: "operator",
+      }),
+    ).toThrow(UnauthorizedException);
+
+    expect(roleManagementService.updateRole).not.toHaveBeenCalled();
+  });
+
+  it("uses the selected business for role updates", async () => {
+    roleManagementService.updateRole.mockResolvedValue({
+      id: membershipId,
+      userId: "550e8400-e29b-41d4-a716-446655440004",
+      role: "viewer",
+      membershipStatus: "active",
+    });
+
+    await controller.updateRole(createRequest(otherBusinessId), membershipId, {
+      role: "viewer",
+    });
+
+    expect(roleManagementService.updateRole).toHaveBeenCalledWith(
+      otherBusinessId,
+      "550e8400-e29b-41d4-a716-446655440000",
+      membershipId,
+      "viewer",
+    );
+  });
+
+  it("allows owners and admins to access the suspension endpoint", () => {
+    const reflector = new Reflector();
+
+    const roles = reflector.get<string[]>(
+      ROLES_KEY,
+      BusinessMembershipsController.prototype.suspendMembership,
+    );
+
+    expect(roles).toEqual(["owner", "admin"]);
+  });
+
+  it("passes authenticated context to the suspension service", async () => {
+    const expected = {
+      id: membershipId,
+      userId: "550e8400-e29b-41d4-a716-446655440004",
+      role: "viewer" as const,
+      membershipStatus: "suspended",
+    };
+
+    suspensionService.suspend.mockResolvedValue(expected);
+
+    const result = await controller.suspendMembership(
+      createRequest(businessId),
+      membershipId,
+    );
+
+    expect(suspensionService.suspend).toHaveBeenCalledTimes(1);
+
+    expect(suspensionService.suspend).toHaveBeenCalledWith(
+      businessId,
+      "550e8400-e29b-41d4-a716-446655440000",
+      membershipId,
+    );
+
+    expect(result).toEqual(expected);
+  });
+
+  it("uses the selected business for suspension", async () => {
+    suspensionService.suspend.mockResolvedValue({
+      id: membershipId,
+      userId: "550e8400-e29b-41d4-a716-446655440004",
+      role: "viewer",
+      membershipStatus: "suspended",
+    });
+
+    await controller.suspendMembership(
+      createRequest(otherBusinessId),
+      membershipId,
+    );
+
+    expect(suspensionService.suspend).toHaveBeenCalledWith(
+      otherBusinessId,
+      "550e8400-e29b-41d4-a716-446655440000",
+      membershipId,
+    );
+
+    expect(suspensionService.suspend).not.toHaveBeenCalledWith(
+      businessId,
+      expect.any(String),
+      membershipId,
+    );
+  });
+
+  it("rejects suspension without authenticated business context", () => {
+    expect(() =>
+      controller.suspendMembership({} as AuthenticatedRequest, membershipId),
+    ).toThrow(UnauthorizedException);
+
+    expect(suspensionService.suspend).not.toHaveBeenCalled();
+  });
+
+  it("allows owners and admins to access the reactivation endpoint", () => {
+    const reflector = new Reflector();
+
+    const roles = reflector.get<string[]>(
+      ROLES_KEY,
+      BusinessMembershipsController.prototype.reactivateMembership,
+    );
+
+    expect(roles).toEqual(["owner", "admin"]);
+  });
+
+  it("passes authenticated context to the reactivation service", async () => {
+    const expected = {
+      id: membershipId,
+      userId: "550e8400-e29b-41d4-a716-446655440004",
+      role: "viewer" as const,
+      membershipStatus: "active",
+    };
+
+    reactivationService.reactivate.mockResolvedValue(expected);
+
+    const result = await controller.reactivateMembership(
+      createRequest(businessId),
+      membershipId,
+    );
+
+    expect(reactivationService.reactivate).toHaveBeenCalledTimes(1);
+
+    expect(reactivationService.reactivate).toHaveBeenCalledWith(
+      businessId,
+      "550e8400-e29b-41d4-a716-446655440000",
+      membershipId,
+    );
+
+    expect(result).toEqual(expected);
+  });
+
+  it("uses the selected business for reactivation", async () => {
+    reactivationService.reactivate.mockResolvedValue({
+      id: membershipId,
+      userId: "550e8400-e29b-41d4-a716-446655440004",
+      role: "operator",
+      membershipStatus: "active",
+    });
+
+    await controller.reactivateMembership(
+      createRequest(otherBusinessId),
+      membershipId,
+    );
+
+    expect(reactivationService.reactivate).toHaveBeenCalledWith(
+      otherBusinessId,
+      "550e8400-e29b-41d4-a716-446655440000",
+      membershipId,
+    );
+
+    expect(reactivationService.reactivate).not.toHaveBeenCalledWith(
+      businessId,
+      expect.any(String),
+      membershipId,
+    );
+  });
+
+  it("rejects reactivation without authenticated business context", () => {
+    expect(() =>
+      controller.reactivateMembership({} as AuthenticatedRequest, membershipId),
+    ).toThrow(UnauthorizedException);
+
+    expect(reactivationService.reactivate).not.toHaveBeenCalled();
+  });
+
+  it("restricts membership removal to owners", () => {
+    const reflector = new Reflector();
+
+    const roles = reflector.get<string[]>(
+      ROLES_KEY,
+      BusinessMembershipsController.prototype.removeMembership,
+    );
+
+    expect(roles).toEqual(["owner"]);
+  });
+
+  it("passes authenticated context to the removal service", async () => {
+    const removedAt = new Date("2026-11-22T12:00:00.000Z");
+
+    const expected = {
+      id: membershipId,
+      userId: "550e8400-e29b-41d4-a716-446655440004",
+      role: "viewer" as const,
+      membershipStatus: "removed" as const,
+      removedAt,
+    };
+
+    removalService.remove.mockResolvedValue(expected);
+
+    const result = await controller.removeMembership(
+      createRequest(businessId),
+      membershipId,
+    );
+
+    expect(removalService.remove).toHaveBeenCalledTimes(1);
+
+    expect(removalService.remove).toHaveBeenCalledWith(
+      businessId,
+      "550e8400-e29b-41d4-a716-446655440000",
+      membershipId,
+    );
+
+    expect(result).toEqual(expected);
+  });
+
+  it("uses the selected business for membership removal", async () => {
+    removalService.remove.mockResolvedValue({
+      id: membershipId,
+      userId: "550e8400-e29b-41d4-a716-446655440004",
+      role: "operator",
+      membershipStatus: "removed",
+      removedAt: new Date(),
+    });
+
+    await controller.removeMembership(
+      createRequest(otherBusinessId),
+      membershipId,
+    );
+
+    expect(removalService.remove).toHaveBeenCalledWith(
+      otherBusinessId,
+      "550e8400-e29b-41d4-a716-446655440000",
+      membershipId,
+    );
+  });
+
+  it("rejects membership removal without authenticated business context", () => {
+    expect(() =>
+      controller.removeMembership({} as AuthenticatedRequest, membershipId),
+    ).toThrow(UnauthorizedException);
+
+    expect(removalService.remove).not.toHaveBeenCalled();
   });
 });
