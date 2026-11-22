@@ -8,11 +8,12 @@ import { Business } from '../src/modules/auth/entities/business.entity';
 import { User } from '../src/modules/auth/entities/user.entity';
 import { InvitationTokenService } from '../src/modules/auth/invitation-token.service';
 import { createTestDataSource } from './helpers/create-test-data-source';
+import { BusinessMembershipInvitationManagementService } from '../src/modules/auth/business-membership-invitation-management.service';
 
 describe('Business membership invitation acceptance integration', () => {
     let dataSource: DataSource;
     let acceptanceService: BusinessMembershipInvitationAcceptanceService;
-
+    let managementService: BusinessMembershipInvitationManagementService;
     let businessId: string;
     let inviterUserId: string;
     let recipientUserId: string;
@@ -93,6 +94,9 @@ describe('Business membership invitation acceptance integration', () => {
             dataSource,
             tokenService,
         );
+
+        managementService =
+            new BusinessMembershipInvitationManagementService(dataSource);
 
         businessId = randomUUID();
         inviterUserId = randomUUID();
@@ -847,5 +851,189 @@ describe('Business membership invitation acceptance integration', () => {
         } finally {
             transactionSpy.mockRestore();
         }
+    });
+
+    describe('Acceptance versus revocation concurrency', () => {
+        it('allows exactly one terminal operation when acceptance and revocation race', async () => {
+            const invitation = await createInvitation('operator');
+
+            const results = await Promise.allSettled([
+                acceptanceService.accept(
+                    invitation.token,
+                    recipientUserId,
+                ),
+                managementService.revoke(
+                    businessId,
+                    invitation.invitationId,
+                ),
+            ]);
+
+            const successful = results.filter(
+                (result) => result.status === 'fulfilled',
+            );
+
+            const rejected = results.filter(
+                (result) => result.status === 'rejected',
+            );
+
+            expect(successful).toHaveLength(1);
+            expect(rejected).toHaveLength(1);
+
+            const invitations: Array<{
+                accepted_at: Date | null;
+                revoked_at: Date | null;
+            }> = await dataSource.query(
+                `
+                SELECT accepted_at, revoked_at
+                FROM business_membership_invitations
+                WHERE id = $1
+                  AND business_id = $2
+            `,
+                [invitation.invitationId, businessId],
+            );
+
+            expect(invitations).toHaveLength(1);
+
+            const accepted = invitations[0].accepted_at !== null;
+            const revoked = invitations[0].revoked_at !== null;
+
+            expect(Number(accepted) + Number(revoked)).toBe(1);
+
+            const memberships: Array<{
+                id: string;
+                role: string;
+                status: string;
+            }> = await dataSource.query(
+                `
+                SELECT id, role, status
+                FROM business_memberships
+                WHERE business_id = $1
+                  AND user_id = $2
+            `,
+                [businessId, recipientUserId],
+            );
+
+            if (accepted) {
+                expect(results[0].status).toBe('fulfilled');
+                expect(results[1].status).toBe('rejected');
+
+                if (results[1].status === 'rejected') {
+                    expect(results[1].reason).toMatchObject({
+                        status: 409,
+                    });
+                }
+
+                expect(memberships).toHaveLength(1);
+                expect(memberships[0]).toMatchObject({
+                    role: 'operator',
+                    status: 'active',
+                });
+            } else {
+                expect(results[0].status).toBe('rejected');
+                expect(results[1].status).toBe('fulfilled');
+
+                if (results[0].status === 'rejected') {
+                    expect(results[0].reason).toMatchObject({
+                        status: 400,
+                    });
+                }
+
+                expect(memberships).toHaveLength(0);
+            }
+        });
+
+        it('prevents revocation after successful acceptance', async () => {
+            const invitation = await createInvitation('viewer');
+
+            await acceptanceService.accept(
+                invitation.token,
+                recipientUserId,
+            );
+
+            await expect(
+                managementService.revoke(
+                    businessId,
+                    invitation.invitationId,
+                ),
+            ).rejects.toMatchObject({
+                status: 409,
+            });
+
+            const invitations: Array<{
+                accepted_at: Date | null;
+                revoked_at: Date | null;
+            }> = await dataSource.query(
+                `
+            SELECT accepted_at, revoked_at
+            FROM business_membership_invitations
+            WHERE id = $1
+        `,
+                [invitation.invitationId],
+            );
+
+            expect(invitations).toHaveLength(1);
+            expect(invitations[0].accepted_at).toBeInstanceOf(Date);
+            expect(invitations[0].revoked_at).toBeNull();
+
+            const memberships: Array<{ id: string }> =
+                await dataSource.query(
+                    `
+                SELECT id
+                FROM business_memberships
+                WHERE business_id = $1
+                  AND user_id = $2
+        `,
+                    [businessId, recipientUserId],
+                );
+
+            expect(memberships).toHaveLength(1);
+        });
+
+        it('prevents acceptance after successful revocation', async () => {
+            const invitation = await createInvitation('viewer');
+
+            await managementService.revoke(
+                businessId,
+                invitation.invitationId,
+            );
+
+            await expect(
+                acceptanceService.accept(
+                    invitation.token,
+                    recipientUserId,
+                ),
+            ).rejects.toMatchObject({
+                status: 400,
+            });
+
+            const invitations: Array<{
+                accepted_at: Date | null;
+                revoked_at: Date | null;
+            }> = await dataSource.query(
+                `
+            SELECT accepted_at, revoked_at
+            FROM business_membership_invitations
+            WHERE id = $1
+        `,
+                [invitation.invitationId],
+            );
+
+            expect(invitations).toHaveLength(1);
+            expect(invitations[0].accepted_at).toBeNull();
+            expect(invitations[0].revoked_at).toBeInstanceOf(Date);
+
+            const memberships: Array<{ id: string }> =
+                await dataSource.query(
+                    `
+                SELECT id
+                FROM business_memberships
+                WHERE business_id = $1
+                  AND user_id = $2
+            `,
+                    [businessId, recipientUserId],
+                );
+
+            expect(memberships).toHaveLength(0);
+        });
     });
 });

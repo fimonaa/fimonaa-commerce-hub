@@ -1,13 +1,16 @@
 import {
   Body,
   Controller,
+  Get,
   Header,
   HttpCode,
   HttpStatus,
+  Param,
+  ParseUUIDPipe,
   Post,
+  Query,
   Req,
 } from "@nestjs/common";
-
 import { Public } from "./decorators/public.decorator";
 import { LoginRequestDto } from "./dto/login-request.dto";
 import { LoginService, type LoginResult } from "./login.service";
@@ -26,15 +29,18 @@ import {
   type CreatedBusinessMembershipInvitation,
 } from "./business-membership-invitation-issuance.service";
 import { IdentityOnly } from "./decorators/identity-only.decorator";
-
 import { AcceptBusinessMembershipInvitationDto } from "./dto/accept-business-membership-invitation.dto";
-
 import {
   BusinessMembershipInvitationAcceptanceService,
   type AcceptedBusinessMembershipInvitation,
 } from "./business-membership-invitation-acceptance.service";
-
 import type { IdentityAuthenticatedRequest } from "./types/authenticated-user.type";
+import { ListBusinessMembershipInvitationsDto } from "./dto/list-business-membership-invitations.dto";
+import {
+  BusinessMembershipInvitationManagementService,
+  type BusinessMembershipInvitationListItem,
+  type BusinessMembershipInvitationListResponse,
+} from "./business-membership-invitation-management.service";
 
 @Controller("auth")
 export class AuthController {
@@ -44,6 +50,7 @@ export class AuthController {
     private readonly invitationPersistenceService: InvitationPersistenceService,
     private readonly businessMembershipInvitationIssuanceService: BusinessMembershipInvitationIssuanceService,
     private readonly businessMembershipInvitationAcceptanceService: BusinessMembershipInvitationAcceptanceService,
+    private readonly businessMembershipInvitationManagementService: BusinessMembershipInvitationManagementService,
   ) {}
 
   /**
@@ -140,6 +147,73 @@ export class AuthController {
     return this.businessMembershipInvitationAcceptanceService.accept(
       request.token,
       authenticatedRequest.user.userId,
+    );
+  }
+
+  /**
+   * GET /api/auth/business-membership-invitations
+   *
+   * Lists invitations for the authenticated business.
+   * Only active owners and admins can access this endpoint.
+   *
+   * Business isolation is enforced using the authenticated context.
+   */
+  @Get("business-membership-invitations")
+  @Roles("owner", "admin")
+  @Header("Cache-Control", "no-store")
+  @HttpCode(HttpStatus.OK)
+  listBusinessMembershipInvitations(
+    @Query() query: ListBusinessMembershipInvitationsDto,
+    @Req() authenticatedRequest: AuthenticatedRequest,
+  ): Promise<BusinessMembershipInvitationListResponse> {
+    return this.businessMembershipInvitationManagementService.list(
+      authenticatedRequest.user.businessId,
+      query,
+    );
+  }
+
+  /**
+   * GET /api/auth/business-membership-invitations/:invitationId
+   *
+   * Retrieves invitation metadata for the authenticated business.
+   * Returns 404 for both missing and cross-business invitations.
+   */
+  @Get("business-membership-invitations/:invitationId")
+  @Roles("owner", "admin")
+  @Header("Cache-Control", "no-store")
+  @HttpCode(HttpStatus.OK)
+  getBusinessMembershipInvitation(
+    @Param("invitationId", new ParseUUIDPipe()) invitationId: string,
+    @Req() authenticatedRequest: AuthenticatedRequest,
+  ): Promise<BusinessMembershipInvitationListItem> {
+    return this.businessMembershipInvitationManagementService.getById(
+      authenticatedRequest.user.businessId,
+      invitationId,
+    );
+  }
+
+  /**
+   * Revokes a pending business membership invitation.
+   *
+   * Only active business owners and admins can revoke invitations
+   * belonging to their authenticated business context.
+   *
+   * The service performs revocation within a database transaction,
+   * preventing an invitation from being accepted and revoked simultaneously.
+   * Invitation tokens and sensitive details are never exposed.
+   */
+  @Post("business-membership-invitations/:invitationId/revoke")
+  @Roles("owner", "admin")
+  @Header("Cache-Control", "no-store")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async revokeBusinessMembershipInvitation(
+    @Param("invitationId", new ParseUUIDPipe())
+    invitationId: string,
+    @Req() authenticatedRequest: AuthenticatedRequest,
+  ): Promise<void> {
+    await this.businessMembershipInvitationManagementService.revoke(
+      authenticatedRequest.user.businessId,
+      invitationId,
     );
   }
 }

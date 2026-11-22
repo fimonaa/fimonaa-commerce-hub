@@ -12,6 +12,7 @@ import { BusinessMembershipInvitationIssuanceService } from '../business-members
 import { BusinessMembershipInvitationAcceptanceService } from '../business-membership-invitation-acceptance.service';
 import { IS_IDENTITY_ONLY_KEY } from '../decorators/identity-only.decorator';
 import type { IdentityAuthenticatedRequest } from '../types/authenticated-user.type';
+import { BusinessMembershipInvitationManagementService } from '../business-membership-invitation-management.service';
 
 describe('AuthController', () => {
   const loginResult = {
@@ -31,6 +32,12 @@ describe('AuthController', () => {
   let businessMembershipInvitationAcceptanceService: jest.Mocked<
     Pick<BusinessMembershipInvitationAcceptanceService, 'accept'>
   >;
+  let businessMembershipInvitationManagementService: jest.Mocked<
+    Pick<
+      BusinessMembershipInvitationManagementService,
+      'list' | 'getById' | 'revoke'
+    >
+  >;
 
   beforeEach(() => {
     loginService = {
@@ -47,6 +54,12 @@ describe('AuthController', () => {
       accept: jest.fn(),
     };
 
+    businessMembershipInvitationManagementService = {
+      list: jest.fn(),
+      getById: jest.fn(),
+      revoke: jest.fn(),
+    };
+
     controller = new AuthController(
       loginService as unknown as LoginService,
       invitationAcceptanceService as unknown as InvitationAcceptanceService,
@@ -55,6 +68,7 @@ describe('AuthController', () => {
       } as unknown as InvitationPersistenceService,
       businessMembershipInvitationIssuanceService as unknown as BusinessMembershipInvitationIssuanceService,
       businessMembershipInvitationAcceptanceService as unknown as BusinessMembershipInvitationAcceptanceService,
+      businessMembershipInvitationManagementService as unknown as BusinessMembershipInvitationManagementService,
     );
   });
 
@@ -369,5 +383,140 @@ describe('AuthController', () => {
         authenticatedRequest,
       ),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('uses the authenticated business when listing membership invitations', async () => {
+    const authenticatedRequest = {
+      user: {
+        userId: '11111111-1111-4111-8111-111111111111',
+        businessId: '22222222-2222-4222-8222-222222222222',
+        role: 'admin',
+      },
+    } as AuthenticatedRequest;
+
+    const query = {
+      status: 'pending' as const,
+      page: 1,
+      limit: 25,
+    };
+
+    const expectedResult = {
+      items: [],
+      pagination: {
+        page: 1,
+        limit: 25,
+        total: 0,
+        totalPages: 0,
+      },
+    };
+
+    businessMembershipInvitationManagementService.list.mockResolvedValue(
+      expectedResult,
+    );
+
+    await expect(
+      controller.listBusinessMembershipInvitations(
+        query,
+        authenticatedRequest,
+      ),
+    ).resolves.toEqual(expectedResult);
+
+    expect(
+      businessMembershipInvitationManagementService.list,
+    ).toHaveBeenCalledWith(
+      authenticatedRequest.user.businessId,
+      query,
+    );
+  });
+
+  it('uses the authenticated business when retrieving invitation details', async () => {
+    const authenticatedRequest = {
+      user: {
+        userId: '11111111-1111-4111-8111-111111111111',
+        businessId: '22222222-2222-4222-8222-222222222222',
+        role: 'owner',
+      },
+    } as AuthenticatedRequest;
+
+    const invitationId = '33333333-3333-4333-8333-333333333333';
+
+    const expectedResult = {
+      invitationId,
+      businessId: authenticatedRequest.user.businessId,
+      invitedEmail: 'employee@example.com',
+      role: 'operator' as const,
+      status: 'pending' as const,
+      invitedByUserId: authenticatedRequest.user.userId,
+      createdAt: new Date('2026-11-22T10:00:00.000Z'),
+      expiresAt: new Date('2026-11-29T10:00:00.000Z'),
+      acceptedAt: null,
+      revokedAt: null,
+    };
+
+    businessMembershipInvitationManagementService.getById.mockResolvedValue(
+      expectedResult,
+    );
+
+    await expect(
+      controller.getBusinessMembershipInvitation(
+        invitationId,
+        authenticatedRequest,
+      ),
+    ).resolves.toEqual(expectedResult);
+
+    expect(
+      businessMembershipInvitationManagementService.getById,
+    ).toHaveBeenCalledWith(
+      authenticatedRequest.user.businessId,
+      invitationId,
+    );
+  });
+
+  it('requires owner or admin permissions for invitation management', () => {
+    const handlers = [
+      controller.listBusinessMembershipInvitations,
+      controller.getBusinessMembershipInvitation,
+    ];
+
+    for (const handler of handlers) {
+      expect(
+        Reflect.getMetadata(ROLES_KEY, handler),
+      ).toEqual(['owner', 'admin']);
+    }
+  });
+
+  it('uses the authenticated business when revoking an invitation', async () => {
+    const invitationId = '8d64c8aa-61b0-49c2-9cbb-5c0a2c98bb20';
+    const businessId = 'cde2f710-36c1-4c24-b9d0-40a0b497ab77';
+
+    const authenticatedRequest = {
+      user: {
+        userId: '3e54095a-f345-498c-b71c-7c72c7b3d892',
+        businessId,
+        role: 'owner',
+      },
+    } as AuthenticatedRequest;
+
+    businessMembershipInvitationManagementService.revoke.mockResolvedValue(
+      undefined,
+    );
+
+    await controller.revokeBusinessMembershipInvitation(
+      invitationId,
+      authenticatedRequest,
+    );
+
+    expect(
+      businessMembershipInvitationManagementService.revoke,
+    ).toHaveBeenCalledWith(businessId, invitationId);
+  });
+
+  it('requires owner or admin permissions for invitation revocation', () => {
+    const roles = Reflect.getMetadata(
+      ROLES_KEY,
+      controller.revokeBusinessMembershipInvitation,
+    );
+
+    expect(roles).toEqual(['owner', 'admin']);
   });
 });
