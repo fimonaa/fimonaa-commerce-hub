@@ -54,6 +54,7 @@ export class BusinessMembershipsService {
           userId: membership.userId,
           email: user.email,
           status: user.status,
+          membershipStatus: membership.status,
           role: membership.role,
           createdAt: membership.createdAt,
         },
@@ -89,6 +90,7 @@ export class BusinessMembershipsService {
       userId: membership.userId,
       email: user.email,
       status: user.status,
+      membershipStatus: membership.status,
       role: membership.role,
       createdAt: membership.createdAt,
     };

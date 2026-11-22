@@ -45,6 +45,7 @@ describe('AuthenticationContextService', () => {
       userId,
       businessId,
       role: 'inventory_manager',
+      status: 'active',
     });
   });
 
@@ -68,6 +69,7 @@ describe('AuthenticationContextService', () => {
     expect(memberships.findOneBy).toHaveBeenCalledWith({
       userId,
       businessId,
+      status: 'active',
     });
   });
 
@@ -107,5 +109,58 @@ describe('AuthenticationContextService', () => {
     expect(users.findOneBy).not.toHaveBeenCalled();
     expect(businesses.findOneBy).not.toHaveBeenCalled();
     expect(memberships.findOneBy).not.toHaveBeenCalled();
+  });
+
+  it('rejects requests without an active business membership', async () => {
+    memberships.findOneBy.mockResolvedValue(null);
+
+    await expect(
+      service.resolve(userId, businessId),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(memberships.findOneBy).toHaveBeenCalledWith({
+      userId,
+      businessId,
+      status: 'active',
+    });
+  });
+
+  describe('resolveIdentity', () => {
+    it('allows an active user without checking business membership', async () => {
+      users.findOneBy.mockResolvedValue({
+        id: userId,
+        status: 'active',
+      } as User);
+
+      await expect(
+        service.resolveIdentity(userId),
+      ).resolves.toEqual({
+        userId,
+      });
+
+      expect(users.findOneBy).toHaveBeenCalledWith({
+        id: userId,
+        status: 'active',
+      });
+
+      expect(businesses.findOneBy).not.toHaveBeenCalled();
+      expect(memberships.findOneBy).not.toHaveBeenCalled();
+    });
+
+    it('rejects users without an active account', async () => {
+      users.findOneBy.mockResolvedValue(null);
+
+      await expect(
+        service.resolveIdentity(userId),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('rejects invalid user identifiers', async () => {
+      await expect(
+        service.resolveIdentity('invalid-user-id'),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(users.findOneBy).not.toHaveBeenCalled();
+    });
   });
 });
