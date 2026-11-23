@@ -24,6 +24,7 @@ import { BusinessMembershipInvitation } from "./entities/business-membership-inv
 import { BusinessMembershipInvitationIssuanceService } from "./business-membership-invitation-issuance.service";
 import { BusinessMembershipInvitationAcceptanceService } from "./business-membership-invitation-acceptance.service";
 import { BusinessMembershipInvitationManagementService } from "./business-membership-invitation-management.service";
+import { MyBusinessesService } from "./my-businesses.service";
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { BusinessMembershipInvitationManagementService } from "./business-member
     AuthenticationContextService,
     { provide: APP_GUARD, useClass: AuthenticationGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    MyBusinessesService,
   ],
   exports: [JwtVerificationService],
 })
