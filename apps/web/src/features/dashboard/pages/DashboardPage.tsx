@@ -1,54 +1,45 @@
-import { useCallback, useEffect, useState } from 'react'
-import MainLayout, {
-  type WorkspacePage,
-} from '../../../layouts/MainLayout'
-import { getDashboardSummary } from '../services/dashboard.service'
-import type { DashboardSummary } from '../types/dashboard.types'
+import { useCallback, useEffect, useState } from "react";
+import MainLayout from "../../../layouts/MainLayout";
+import { getDashboardSummary } from "../services/dashboard.service";
+import type { DashboardSummary } from "../types/dashboard.types";
 
-
-function getMetric(
-  data: DashboardSummary | null,
-  keys: string[],
-): string {
-  if (!data) return '—'
+function getMetric(data: DashboardSummary | null, keys: string[]): string {
+  if (!data) return "—";
 
   for (const key of keys) {
-    const value = data[key]
+    const value = data[key];
 
-    if (typeof value === 'number') {
-      return value.toLocaleString()
+    if (typeof value === "number") {
+      return value.toLocaleString();
     }
 
-    if (typeof value === 'string' && value.trim() !== '') {
-      return value
+    if (typeof value === "string" && value.trim() !== "") {
+      return value;
     }
   }
 
-  return '—'
+  return "—";
 }
 
 function Icon({
   name,
-  className = 'h-5 w-5',
+  className = "h-5 w-5",
 }: {
-  name: string
-  className?: string
+  name: string;
+  className?: string;
 }) {
   const paths: Record<string, string> = {
-    dashboard:
-      'M3 3h7v7H3z M14 3h7v4h-7z M14 10h7v11h-7z M3 14h7v7H3z',
-    inventory:
-      'M3 7 12 2l9 5-9 5-9-5Z M3 12l9 5 9-5 M3 17l9 5 9-5',
-    activity: 'M3 12h4l3-8 4 16 3-8h4',
-    imports: 'M12 3v12m-5-5 5 5 5-5 M4 17v4h16v-4',
-    search:
-      'm20 20-4.5-4.5 M18 10.5a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z',
+    dashboard: "M3 3h7v7H3z M14 3h7v4h-7z M14 10h7v11h-7z M3 14h7v7H3z",
+    inventory: "M3 7 12 2l9 5-9 5-9-5Z M3 12l9 5 9-5 M3 17l9 5 9-5",
+    activity: "M3 12h4l3-8 4 16 3-8h4",
+    imports: "M12 3v12m-5-5 5 5 5-5 M4 17v4h16v-4",
+    search: "m20 20-4.5-4.5 M18 10.5a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z",
     refresh:
-      'M20 7v5h-5 M4 17v-5h5 M5.6 9a7 7 0 0 1 11.7-2L20 12 M4 12l2.7 5a7 7 0 0 0 11.7-2',
-    arrow: 'M5 12h14 M13 6l6 6-6 6',
+      "M20 7v5h-5 M4 17v-5h5 M5.6 9a7 7 0 0 1 11.7-2L20 12 M4 12l2.7 5a7 7 0 0 0 11.7-2",
+    arrow: "M5 12h14 M13 6l6 6-6 6",
     alert:
-      'M12 9v4m0 4h.01 M10.3 3.9 2.5 17.4A2 2 0 0 0 4.2 20h15.6a2 2 0 0 0 1.7-2.6L13.7 3.9a2 2 0 0 0-3.4 0Z',
-  }
+      "M12 9v4m0 4h.01 M10.3 3.9 2.5 17.4A2 2 0 0 0 4.2 20h15.6a2 2 0 0 0 1.7-2.6L13.7 3.9a2 2 0 0 0-3.4 0Z",
+  };
 
   return (
     <svg
@@ -63,86 +54,72 @@ function Icon({
     >
       <path d={paths[name] ?? paths.dashboard} />
     </svg>
-  )
+  );
 }
 
 const metrics = [
   {
-    label: 'Total SKUs',
-    keys: ['totalSkus', 'totalSKUs', 'total_skus'],
-    description: 'Products in your catalogue',
-    icon: 'inventory',
-    iconStyle: 'bg-[#f9e8ef] text-[#ad3a68]',
+    label: "Total SKUs",
+    keys: ["totalSkus", "totalSKUs", "total_skus"],
+    description: "Products in your catalogue",
+    icon: "inventory",
+    iconStyle: "bg-[#f9e8ef] text-[#ad3a68]",
   },
   {
-    label: 'Available stock',
-    keys: ['availableStock', 'available_stock'],
-    description: 'Units available to sell',
-    icon: 'activity',
-    iconStyle: 'bg-[#fff0e7] text-[#b76d42]',
+    label: "Available stock",
+    keys: ["availableStock", "available_stock"],
+    description: "Units available to sell",
+    icon: "activity",
+    iconStyle: "bg-[#fff0e7] text-[#b76d42]",
   },
   {
-    label: 'Low stock',
-    keys: ['lowStockSkus', 'lowStock', 'low_stock_skus', 'low_stock'],
-    description: 'Items to review',
-    icon: 'alert',
-    iconStyle: 'bg-[#fff5dd] text-[#a67b22]',
+    label: "Low stock",
+    keys: ["lowStockSkus", "lowStock", "low_stock_skus", "low_stock"],
+    description: "Items to review",
+    icon: "alert",
+    iconStyle: "bg-[#fff5dd] text-[#a67b22]",
   },
   {
-    label: 'Out of stock',
-    keys: [
-      'outOfStockSkus',
-      'outOfStock',
-      'out_of_stock_skus',
-      'out_of_stock',
-    ],
-    description: 'Items needing replenishment',
-    icon: 'imports',
-    iconStyle: 'bg-[#f0edef] text-[#6e6469]',
+    label: "Out of stock",
+    keys: ["outOfStockSkus", "outOfStock", "out_of_stock_skus", "out_of_stock"],
+    description: "Items needing replenishment",
+    icon: "imports",
+    iconStyle: "bg-[#f0edef] text-[#6e6469]",
   },
-]
+];
 
-// Define the navigation callback that App.tsx passes to this page.
-type DashboardPageProps = {
-  onNavigate: (page: WorkspacePage) => void
-}
-
-export default function DashboardPage({
-  onNavigate,
-}: DashboardPageProps) {
-  const [summary, setSummary] = useState<DashboardSummary | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [search, setSearch] = useState('')
+export default function DashboardPage() {
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
 
   const loadSummary = useCallback(async () => {
-    setLoading(true)
-    setError('')
+    setLoading(true);
+    setError("");
 
     try {
-      const data = await getDashboardSummary()
-      setSummary(data)
-      return data
+      const data = await getDashboardSummary();
+      setSummary(data);
+      return data;
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : 'Could not load dashboard data.',
-      )
-      return null
+        err instanceof Error ? err.message : "Could not load dashboard data.",
+      );
+      return null;
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
 
     getDashboardSummary()
       .then((data) => {
         if (!cancelled) {
-          setSummary(data)
-          setError('')
+          setSummary(data);
+          setError("");
         }
       })
       .catch((err: unknown) => {
@@ -150,25 +127,24 @@ export default function DashboardPage({
           setError(
             err instanceof Error
               ? err.message
-              : 'Could not load dashboard data.',
-          )
+              : "Could not load dashboard data.",
+          );
         }
       })
       .finally(() => {
         if (!cancelled) {
-          setLoading(false)
+          setLoading(false);
         }
-      })
+      });
 
     return () => {
-      cancelled = true
-    }
-  }, [])
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <MainLayout
       activePage="dashboard"
-      onNavigate={onNavigate}
       onRefresh={() => void loadSummary()}
       loading={loading}
     >
@@ -186,8 +162,8 @@ export default function DashboardPage({
 
             <p className="mt-3 max-w-xl text-sm leading-6 text-[#dfd0d5]">
               A clearer view of your inventory starts here. Monitor your
-              catalogue, keep stock healthy, and build confidently across
-              sales channels.
+              catalogue, keep stock healthy, and build confidently across sales
+              channels.
             </p>
           </div>
 
@@ -238,16 +214,16 @@ export default function DashboardPage({
 
             <span className="text-xs text-[#a09295]">
               {loading
-                ? 'Updating…'
+                ? "Updating…"
                 : summary
-                  ? 'Connected response received'
-                  : 'Awaiting connection'}
+                  ? "Connected response received"
+                  : "Awaiting connection"}
             </span>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {metrics.map((metric) => {
-              const value = getMetric(summary, metric.keys)
+              const value = getMetric(summary, metric.keys);
 
               return (
                 <article
@@ -278,7 +254,7 @@ export default function DashboardPage({
                     {metric.description}
                   </p>
                 </article>
-              )
+              );
             })}
           </div>
         </section>
@@ -333,7 +309,7 @@ export default function DashboardPage({
                 </h3>
 
                 <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-[#96898d]">
-                  {search ? `Searching for “${search}”. ` : ''}
+                  {search ? `Searching for “${search}”. ` : ""}
                   The catalogue table will populate when we connect the SKU
                   listing endpoint. No sample products are shown here.
                 </p>
@@ -368,8 +344,8 @@ export default function DashboardPage({
                 </p>
 
                 <p className="mt-1.5 text-xs leading-5 text-[#96898d]">
-                  We will connect this panel to the stock movements API so
-                  every adjustment is traceable.
+                  We will connect this panel to the stock movements API so every
+                  adjustment is traceable.
                 </p>
               </div>
             </article>
@@ -397,17 +373,15 @@ export default function DashboardPage({
                   </p>
 
                   <p className="mt-1 text-xs leading-5 text-[#887c7f]">
-                    The initial stock import has been completed. We will
-                    display the exact import timestamp and quantity once
-                    the import-history endpoint is connected.
+                    The initial stock import has been completed. We will display
+                    the exact import timestamp and quantity once the
+                    import-history endpoint is connected.
                   </p>
                 </div>
               </div>
 
               <div className="mt-4 flex items-center justify-between border-t border-[#f1e9e8] pt-4">
-                <span className="text-xs text-[#96898d]">
-                  Import history
-                </span>
+                <span className="text-xs text-[#96898d]">Import history</span>
 
                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#a92f62]">
                   Coming soon
@@ -425,5 +399,5 @@ export default function DashboardPage({
         </footer>
       </div>
     </MainLayout>
-  )
+  );
 }

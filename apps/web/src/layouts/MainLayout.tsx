@@ -1,32 +1,30 @@
-import type { ReactNode } from 'react'
+import type { ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 
-export type WorkspacePage = 'dashboard' | 'inventory'
+export type WorkspacePage = "dashboard" | "inventory";
 
 type MainLayoutProps = {
-  children: ReactNode
-  activePage: WorkspacePage
-  onNavigate: (page: WorkspacePage) => void
-  onRefresh: () => void
-  loading: boolean
-}
+  children: ReactNode;
+  activePage: WorkspacePage;
+  onRefresh: () => void;
+  loading: boolean;
+};
 
 function Icon({
   name,
-  className = 'h-5 w-5',
+  className = "h-5 w-5",
 }: {
-  name: string
-  className?: string
+  name: string;
+  className?: string;
 }) {
   const paths: Record<string, string> = {
-    dashboard:
-      'M3 3h7v7H3z M14 3h7v4h-7z M14 10h7v11h-7z M3 14h7v7H3z',
-    inventory:
-      'M3 7 12 2l9 5-9 5-9-5Z M3 12l9 5 9-5 M3 17l9 5 9-5',
-    activity: 'M3 12h4l3-8 4 16 3-8h4',
-    imports: 'M12 3v12m-5-5 5 5 5-5 M4 17v4h16v-4',
+    dashboard: "M3 3h7v7H3z M14 3h7v4h-7z M14 10h7v11h-7z M3 14h7v7H3z",
+    inventory: "M3 7 12 2l9 5-9 5-9-5Z M3 12l9 5 9-5 M3 17l9 5 9-5",
+    activity: "M3 12h4l3-8 4 16 3-8h4",
+    imports: "M12 3v12m-5-5 5 5 5-5 M4 17v4h16v-4",
     refresh:
-      'M20 7v5h-5 M4 17v-5h5 M5.6 9a7 7 0 0 1 11.7-2L20 12 M4 12l2.7 5a7 7 0 0 1 1.7-2',
-  }
+      "M20 7v5h-5 M4 17v-5h5 M5.6 9a7 7 0 0 1 11.7-2L20 12 M4 12l2.7 5a7 7 0 0 1 1.7-2",
+  };
 
   return (
     <svg
@@ -41,23 +39,23 @@ function Icon({
     >
       <path d={paths[name] ?? paths.dashboard} />
     </svg>
-  )
+  );
 }
 
 const navigation = [
-  { label: 'Dashboard', icon: 'dashboard', page: 'dashboard' as const },
-  { label: 'Inventory', icon: 'inventory', page: 'inventory' as const },
-  { label: 'Stock Movements', icon: 'activity', page: null },
-  { label: 'Imports', icon: 'imports', page: null },
-]
+  { label: "Dashboard", icon: "dashboard", page: "dashboard" as const },
+  { label: "Inventory", icon: "inventory", page: "inventory" as const },
+  { label: "Stock Movements", icon: "activity", page: null },
+  { label: "Imports", icon: "imports", page: null },
+];
 
 export default function MainLayout({
   children,
   activePage,
-  onNavigate,
   onRefresh,
   loading,
 }: MainLayoutProps) {
+  const navigate = useNavigate();
   return (
     <div className="min-h-screen bg-[#faf7f5] text-[#292326]">
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r border-[#eee5e4] bg-white lg:flex">
@@ -81,21 +79,23 @@ export default function MainLayout({
 
           <nav aria-label="Main navigation" className="mt-3 space-y-1">
             {navigation.map((item) => {
-              const isActive = item.page === activePage
+              const isActive = item.page === activePage;
 
               return (
                 <button
                   key={item.label}
                   type="button"
                   disabled={!item.page}
-                  aria-current={isActive ? 'page' : undefined}
+                  aria-current={isActive ? "page" : undefined}
                   onClick={() => {
-                    if (item.page) onNavigate(item.page)
+                    if (item.page) {
+                      navigate(item.page === "dashboard" ? "/" : "/inventory");
+                    }
                   }}
                   className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
                     isActive
-                      ? 'bg-[#f9eaf0] font-semibold text-[#a92f62]'
-                      : 'text-[#756b6e] hover:bg-[#faf5f6] disabled:cursor-not-allowed disabled:opacity-50'
+                      ? "bg-[#f9eaf0] font-semibold text-[#a92f62]"
+                      : "text-[#756b6e] hover:bg-[#faf5f6] disabled:cursor-not-allowed disabled:opacity-50"
                   }`}
                 >
                   <Icon name={item.icon} />
@@ -105,7 +105,7 @@ export default function MainLayout({
                     <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#b6386d]" />
                   )}
                 </button>
-              )
+              );
             })}
           </nav>
         </div>
@@ -132,11 +132,14 @@ export default function MainLayout({
         <header className="flex min-h-24 flex-wrap items-center justify-between gap-4 border-b border-[#eee5e4] bg-white/80 px-5 py-5 backdrop-blur sm:px-8 lg:px-10">
           <div>
             <p className="text-xs font-medium text-[#a09295]">
-              Workspace / {activePage === 'inventory' ? 'Inventory' : 'Overview'}
+              Workspace /{" "}
+              {activePage === "inventory" ? "Inventory" : "Overview"}
             </p>
 
             <h1 className="mt-1.5 text-2xl font-semibold tracking-tight">
-              {activePage === 'inventory' ? 'Inventory management' : 'Inventory dashboard'}
+              {activePage === "inventory"
+                ? "Inventory management"
+                : "Inventory dashboard"}
             </h1>
           </div>
 
@@ -153,7 +156,7 @@ export default function MainLayout({
               className="inline-flex items-center gap-2 rounded-xl border border-[#e9dfe1] bg-white px-4 py-2.5 text-sm font-medium text-[#594d51] shadow-sm hover:border-[#d9a5b8] disabled:opacity-60"
             >
               <Icon name="refresh" />
-              {loading ? 'Refreshing…' : 'Refresh data'}
+              {loading ? "Refreshing…" : "Refresh data"}
             </button>
 
             <div
@@ -168,5 +171,5 @@ export default function MainLayout({
         {children}
       </main>
     </div>
-  )
+  );
 }
