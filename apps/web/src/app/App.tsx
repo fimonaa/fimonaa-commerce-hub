@@ -1,14 +1,16 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-
 import LoginPage from "../features/auth/pages/LoginPage";
 import DashboardPage from "../features/dashboard/pages/DashboardPage";
 import InventoryPage from "../features/inventory/pages/InventoryPage";
+import BusinessSelectionPage from "../features/auth/pages/BusinessSelectionPage";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+
+        <Route path="/select-business" element={<BusinessSelectionPage />} />
 
         <Route path="/" element={<DashboardPage />} />
 
