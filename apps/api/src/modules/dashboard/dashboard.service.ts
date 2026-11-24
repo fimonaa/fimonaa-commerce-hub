@@ -1,12 +1,20 @@
-import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { Injectable } from "@nestjs/common";
+import { DataSource } from "typeorm";
 
 @Injectable()
 export class DashboardService {
   constructor(private readonly dataSource: DataSource) {}
 
-  async getSummary() {
-    const [inventory] = await this.dataSource.query(`
+  async getSummary(businessId: string) {
+    /**
+     * Dashboard inventory metrics must be scoped to the authenticated
+     * business. The business ID comes from the verified authentication
+     * context and is passed as a parameterized SQL value.
+     *
+     * Never calculate dashboard metrics across all businesses.
+     */
+    const [inventory] = await this.dataSource.query(
+      `
       SELECT
         COUNT(*)::int AS "totalSkus",
         COALESCE(SUM(available_stock), 0)::int AS "availableStock",
@@ -17,7 +25,10 @@ export class DashboardService {
           WHERE available_stock = 0
         )::int AS "outOfStockSkus"
       FROM inventory_skus
-    `);
+      WHERE business_id = $1
+    `,
+      [businessId],
+    );
 
     return {
       totalSkus: inventory.totalSkus,
@@ -25,18 +36,20 @@ export class DashboardService {
       lowStockSkus: inventory.lowStockSkus,
       outOfStockSkus: inventory.outOfStockSkus,
 
+      // These metrics remain placeholders until their respective
+      // business scoped modules are implemented.
       ordersToday: 0,
       pendingFulfillment: 0,
       failedSyncJobs: 0,
 
       channels: [
-        { code: 'shopify', name: 'Shopify', status: 'not_connected' },
-        { code: 'myntra', name: 'Myntra', status: 'not_connected' },
-        { code: 'ajio', name: 'AJIO', status: 'not_connected' },
+        { code: "shopify", name: "Shopify", status: "not_connected" },
+        { code: "myntra", name: "Myntra", status: "not_connected" },
+        { code: "ajio", name: "AJIO", status: "not_connected" },
         {
-          code: 'nykaa',
-          name: 'Nykaa Fashion',
-          status: 'not_connected',
+          code: "nykaa",
+          name: "Nykaa Fashion",
+          status: "not_connected",
         },
       ],
     };

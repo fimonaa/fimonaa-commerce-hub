@@ -1,16 +1,16 @@
-import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { Injectable } from "@nestjs/common";
+import { DataSource } from "typeorm";
 
 import {
   ListInventoryQueryDto,
   type InventoryStockStatus,
-} from './dto/list-inventory-query.dto';
+} from "./dto/list-inventory-query.dto";
 
 import type {
   InventoryItem,
   InventoryItemStatus,
   InventoryListResponse,
-} from './types/inventory.types';
+} from "./types/inventory.types";
 
 @Injectable()
 export class InventoryService {
@@ -20,18 +20,13 @@ export class InventoryService {
     businessId: string,
     query: ListInventoryQueryDto,
   ): Promise<InventoryListResponse> {
-    const {
-      search,
-      stockStatus = 'all',
-      page = 1,
-      limit = 25,
-    } = query;
+    const { search, stockStatus = "all", page = 1, limit = 25 } = query;
 
     // Share the WHERE clause between the count and result queries
     // so both queries apply exactly the same filters.
     // Every inventory query must be restricted to one business.
     // Bind the business UUID as the first SQL parameter.
-    const conditions: string[] = ['business_id = $1'];
+    const conditions: string[] = ["business_id = $1"];
     const parameters: unknown[] = [businessId];
 
     if (search?.trim()) {
@@ -49,9 +44,7 @@ export class InventoryService {
     this.addStockStatusFilter(stockStatus, conditions);
 
     const whereClause =
-      conditions.length > 0
-        ? `WHERE ${conditions.join(' AND ')}`
-        : '';
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
     // Count matching records without loading all inventory rows.
     const countRows: Array<{ totalItems: number }> =
@@ -109,10 +102,7 @@ export class InventoryService {
     // NULL for initialStock when no opening quantity was recorded.
     const data: InventoryItem[] = rows.map((row) => ({
       ...row,
-      initialStock:
-        row.initialStock === null
-          ? null
-          : Number(row.initialStock),
+      initialStock: row.initialStock === null ? null : Number(row.initialStock),
       availableStock: Number(row.availableStock),
       sourceRow: Number(row.sourceRow),
     }));
@@ -135,19 +125,19 @@ export class InventoryService {
     conditions: string[],
   ): void {
     switch (stockStatus) {
-      case 'in_stock':
-        conditions.push('available_stock > 5');
+      case "in_stock":
+        conditions.push("available_stock > 5");
         break;
 
-      case 'low_stock':
-        conditions.push('available_stock BETWEEN 1 AND 5');
+      case "low_stock":
+        conditions.push("available_stock BETWEEN 1 AND 5");
         break;
 
-      case 'out_of_stock':
-        conditions.push('available_stock = 0');
+      case "out_of_stock":
+        conditions.push("available_stock = 0");
         break;
 
-      case 'all':
+      case "all":
         // No stock filter is needed when all statuses are requested.
         break;
     }

@@ -1,13 +1,27 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Req, UnauthorizedException } from "@nestjs/common";
 
-import { DashboardService } from './dashboard.service';
+import type { AuthenticatedRequest } from "../auth/types/authenticated-user.type";
+import { DashboardService } from "./dashboard.service";
 
-@Controller('dashboard')
+@Controller("dashboard")
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
-  @Get('summary')
-  getSummary() {
-    return this.dashboardService.getSummary();
+  /**
+   * Returns dashboard metrics for the authenticated business.
+   * The global AuthenticationGuard verifies the user's
+   * active membership before this controller executes.
+   */
+  @Get("summary")
+  getSummary(@Req() request: AuthenticatedRequest) {
+    const businessId = request.user?.businessId;
+
+    if (!businessId) {
+      throw new UnauthorizedException(
+        "Authenticated business context required",
+      );
+    }
+
+    return this.dashboardService.getSummary(businessId);
   }
 }
