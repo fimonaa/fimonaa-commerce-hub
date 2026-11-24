@@ -19,6 +19,7 @@ export interface AuthState {
 export interface AuthContextValue extends AuthState {
   login: (email: string, password: string) => Promise<void>;
   selectBusiness: (businessId: string) => void;
+  clearSelectedBusiness: () => void;
   logout: () => void;
 }
 

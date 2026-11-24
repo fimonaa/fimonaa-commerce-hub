@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import MainLayout from "../../../layouts/MainLayout";
 import { getDashboardSummary } from "../services/dashboard.service";
 import type { DashboardSummary } from "../types/dashboard.types";
+import { useAuth } from "../../auth/context/useAuth";
 
 function getMetric(data: DashboardSummary | null, keys: string[]): string {
   if (!data) return "—";
@@ -89,33 +90,37 @@ const metrics = [
 ];
 
 export default function DashboardPage() {
+  const { accessToken, selectedBusiness } = useAuth();
+
+  const businessId = selectedBusiness?.id;
+
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const loadSummary = useCallback(async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const data = await getDashboardSummary();
-      setSummary(data);
-      return data;
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Could not load dashboard data.",
-      );
-      return null;
-    } finally {
-      setLoading(false);
-    }
+  const loadSummary = useCallback(() => {
+    setRefreshKey((current) => current + 1);
   }, []);
 
   useEffect(() => {
+    if (!accessToken || !businessId) {
+      return;
+    }
+
+    const controller = new AbortController();
     let cancelled = false;
 
-    getDashboardSummary()
+    setSummary(null);
+    setLoading(true);
+    setError("");
+
+    getDashboardSummary({
+      accessToken,
+      businessId,
+      signal: controller.signal,
+    })
       .then((data) => {
         if (!cancelled) {
           setSummary(data);
@@ -123,7 +128,7 @@ export default function DashboardPage() {
         }
       })
       .catch((err: unknown) => {
-        if (!cancelled) {
+        if (!cancelled && !controller.signal.aborted) {
           setError(
             err instanceof Error
               ? err.message
@@ -139,8 +144,9 @@ export default function DashboardPage() {
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, []);
+  }, [accessToken, businessId, refreshKey]);
 
   return (
     <MainLayout
@@ -365,17 +371,17 @@ export default function DashboardPage() {
               </div>
 
               <div className="mt-5 flex items-start gap-3 rounded-xl bg-[#f7f5f3] p-4">
-                <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-amber-400" />
 
                 <div>
                   <p className="text-sm font-semibold">
-                    Opening balance recorded
+                    Import status unavailable
                   </p>
 
                   <p className="mt-1 text-xs leading-5 text-[#887c7f]">
-                    The initial stock import has been completed. We will display
-                    the exact import timestamp and quantity once the
-                    import-history endpoint is connected.
+                    Opening balance information will appear here once the import
+                    history service is connected. No import has been verified
+                    for this workspace.
                   </p>
                 </div>
               </div>

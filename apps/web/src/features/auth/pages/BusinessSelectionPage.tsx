@@ -1,15 +1,7 @@
 import { Navigate, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../context/useAuth";
-import type { BusinessRole } from "../types/auth.types";
-
-const roleLabels: Record<BusinessRole, string> = {
-  owner: "Owner",
-  admin: "Administrator",
-  inventory_manager: "Inventory Manager",
-  operator: "Operator",
-  viewer: "Viewer",
-};
+import { getBusinessRoleLabel } from "../../../features/auth/utils/business-role.utils";
 
 export default function BusinessSelectionPage() {
   const navigate = useNavigate();
@@ -93,7 +85,7 @@ export default function BusinessSelectionPage() {
                       </p>
 
                       <p className="mt-1 text-xs text-[#887c7f]">
-                        {roleLabels[business.role]}
+                        {getBusinessRoleLabel(business.role)}
                       </p>
                     </div>
                   </div>

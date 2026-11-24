@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../../auth/context/useAuth";
 import MainLayout from "../../../layouts/MainLayout";
 import { getInventory } from "../services/inventory.service";
 import type {
@@ -78,6 +79,8 @@ function SummaryCard({
 }
 
 export default function InventoryPage() {
+  const { accessToken, selectedBusiness } = useAuth();
+  const businessId = selectedBusiness?.id;
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [stockStatus, setStockStatus] = useState<InventoryStockStatus>("all");
@@ -105,9 +108,17 @@ export default function InventoryPage() {
   useEffect(() => {
     const controller = new AbortController();
 
+    // Clear inventory from the previously selected business.
+    setResult(null);
+    setError("");
+
+    if (!accessToken || !businessId) {
+      setLoading(false);
+      return () => controller.abort();
+    }
+
     async function loadInventory() {
       setLoading(true);
-      setError("");
 
       try {
         const response = await getInventory(
@@ -117,10 +128,16 @@ export default function InventoryPage() {
             page,
             limit: PAGE_SIZE,
           },
-          controller.signal,
+          {
+            accessToken: accessToken!,
+            businessId: businessId!,
+            signal: controller.signal,
+          },
         );
 
-        setResult(response);
+        if (!controller.signal.aborted) {
+          setResult(response);
+        }
       } catch (err) {
         if (controller.signal.aborted) return;
 
@@ -137,7 +154,7 @@ export default function InventoryPage() {
     void loadInventory();
 
     return () => controller.abort();
-  }, [search, stockStatus, page, refreshKey]);
+  }, [accessToken, businessId, search, stockStatus, page, refreshKey]);
 
   // Changing this value triggers the existing loading effect.
   // This reuses its cancellation and error-handling behaviour.

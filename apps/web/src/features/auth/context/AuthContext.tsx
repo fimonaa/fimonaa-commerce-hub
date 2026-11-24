@@ -175,6 +175,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const clearSelectedBusiness = useCallback(() => {
+    setState((current) => {
+      if (!current.accessToken || current.businesses.length <= 1) {
+        return current;
+      }
+
+      return {
+        ...current,
+        selectedBusiness: null,
+        status: "selecting",
+        error: null,
+      };
+    });
+  }, []);
+
   useEffect(() => {
     return () => {
       requestIdRef.current += 1;
@@ -189,6 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...state,
         login,
         selectBusiness,
+        clearSelectedBusiness,
         logout,
       }}
     >

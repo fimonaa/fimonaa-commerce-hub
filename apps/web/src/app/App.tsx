@@ -1,8 +1,10 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+
+import ProtectedRoute from "../features/auth/components/ProtectedRoute";
+import BusinessSelectionPage from "../features/auth/pages/BusinessSelectionPage";
 import LoginPage from "../features/auth/pages/LoginPage";
 import DashboardPage from "../features/dashboard/pages/DashboardPage";
 import InventoryPage from "../features/inventory/pages/InventoryPage";
-import BusinessSelectionPage from "../features/auth/pages/BusinessSelectionPage";
 
 function App() {
   return (
@@ -12,11 +14,25 @@ function App() {
 
         <Route path="/select-business" element={<BusinessSelectionPage />} />
 
-        <Route path="/" element={<DashboardPage />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
 
-        <Route path="/inventory" element={<InventoryPage />} />
+        <Route
+          path="/inventory"
+          element={
+            <ProtectedRoute>
+              <InventoryPage />
+            </ProtectedRoute>
+          }
+        />
 
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
