@@ -2,9 +2,9 @@
 
 Fimonaa Commerce Hub is an inventory-first, multi-business commerce operations platform under development for Fimonaa India, Fimonaa Finland, and potential future business workspaces.
 
-**Current milestone:** Business Membership Management Phase 2B, merged through PR #11 (`c852d35`).
+**Current development checkpoint:** Authenticated frontend workspaces, tenant-scoped dashboard and inventory APIs, and safe development inventory fixtures. Latest implementation commit: `0a1b0ce`.
 
-**Status:** The backend includes authentication, account activation, business membership invitations, business-scoped authorization, inventory listing, membership lifecycle administration, and guarded opening-balance import functionality.
+**Status:** The backend includes authentication, account activation, business membership invitations, business-scoped authorization, tenant-scoped dashboard and inventory APIs, membership lifecycle administration, and guarded opening-balance import functionality. The frontend includes login, business workspace selection, authenticated navigation, dashboard, inventory search, stock filtering, and pagination.
 
 **Production readiness:** The platform is **not production ready**.
 
@@ -55,26 +55,58 @@ Confirm ports against the current Compose configuration if it has changed.
 
 ## Backend setup
 
-From the repository root, prepare the backend environment:
-
-```bash
-cp apps/api/.env.example apps/api/.env
-```
-
-Review the database configuration before starting the API.
-
-Then run:
+From the repository root, install dependencies:
 
 ```bash
 npm install
-npm run dev:api
 ```
 
-**Database safety:** The normal `DATABASE_URL` may point to the protected `fimonaa_commerce` database.
+For local development, use the Git-ignored configuration file `apps/api/.env.development.local`.
 
-Confirm the target and use an appropriate development database.
+Configure this file to connect exclusively to the approved local PostgreSQL database `fimonaa_commerce_dev`.
 
-Starting the API does not authorize migrations, imports, seeds or writes to protected inventory.
+The guarded launcher reads this development-specific configuration and validates the database target before executing supported commands.
+
+**Important:** Do not overwrite `apps/api/.env`, as it may contain protected database configuration. Never copy production credentials into the development environment file.
+
+Start the backend through the guarded launcher:
+
+    node apps/api/scripts/run-local-dev.cjs api
+
+Start the frontend in a separate terminal:
+
+    npm run dev -w apps/web
+
+The guarded launcher validates the database configuration before executing supported development commands.
+
+Supported commands:
+
+| Command              | Purpose                                                        |
+| -------------------- | -------------------------------------------------------------- |
+| `api`                | Start the NestJS development server                            |
+| `migration:show`     | Inspect development database migrations                        |
+| `migration:run`      | Apply reviewed migrations to the approved development database |
+| `seed:dev-auth`      | Create or verify synthetic development users and businesses    |
+| `seed:dev-inventory` | Create or verify synthetic development inventory               |
+
+Run these commands through:
+
+    node apps/api/scripts/run-local-dev.cjs <command>
+
+Database environments:
+
+| Database | Purpose |
+| --------------------------
+---- | ----------------------------------- |
+| `fimonaa_commerce` | Protected database |
+| `fimonaa_commerce_dev` | Approved local development database |
+| `fimonaa_commerce_import_test` | Isolated integration-test database |
+
+**Safety:** Never run migrations, imports, seeds, destructive SQL, or integration tests against the protected database without explicit authorization.
+
+The unguarded `npm run dev:api` command is not the recommended local development workflow.
+
+Starting the API does not authorize modifications to protected inventory.
 
 ## API overview
 
@@ -327,45 +359,89 @@ Do not run integration tests until the database safety checks have been confirme
 
 ### Completed milestones
 
-| Milestone                               | Reference                    | Status      |
-| --------------------------------------- | ---------------------------- | ----------- |
-| Business-scoped inventory authorization | PR #6, `d4e5296`             | Merged      |
-| Authentication and initial invitations  | PR #7, `d1c25be`             | Merged      |
-| Development Documentation v1.4          | PR #8, `537bc9f`             | Merged      |
-| Business Membership Management Phase 1  | PR #9, `5de2992`             | Merged      |
-| Development Documentation v1.5          | PR #10, `f757124`            | Merged      |
-| Business Membership Management Phase 2B | PR #11, `c852d35`            | Merged      |
-| Development Documentation v1.6          | Current documentation branch | In progress |
+| Milestone                               | Reference                            | Status             |
+| --------------------------------------- | ------------------------------------ | ------------------ |
+| Business-scoped inventory authorization | PR #6, `d4e5296`                     | Merged             |
+| Authentication and initial invitations  | PR #7, `d1c25be`                     | Merged             |
+| Development Documentation v1.4          | PR #8, `537bc9f`                     | Merged             |
+| Business Membership Management Phase 1  | PR #9, `5de2992`                     | Merged             |
+| Development Documentation v1.5          | PR #10, `f757124`                    | Merged             |
+| Business Membership Management Phase 2B | PR #11, `c852d35`                    | Merged             |
+| Development Documentation v1.6          | Historical Phase 2B documentation    | Superseded by v1.7 |
+| Development Documentation v1.7          | feature/business-membership-frontend | In progress        |
+
+### Current frontend implementation
+
+The `feature/business-membership-frontend` branch includes the following implemented functionality:
+
+- Typed authenticated API client.
+- Authentication context and session management.
+- Login page.
+- Business workspace selection.
+- Authenticated application navigation.
+- Tenant-scoped dashboard API and frontend.
+- Inventory listing with search, stock-status filtering and pagination.
+- Improved inventory empty states.
+- Guarded local development tooling.
+- Synthetic development authentication and inventory fixtures.
+
+These changes have been committed on the development branch. They must not be described as merged into `main` until the pull request has been reviewed and merged.
+
+The historical Phase 2B backend membership-management milestone remains complete. The frontend membership administration screens, including invitation management, role changes, suspension and removal, remain future work unless separately verified.
+
+### Latest recorded development verification
+
+The more recent development checkpoint recorded:
+
+| Verification               | Result                      |
+| -------------------------- | --------------------------- |
+| Backend tests              | 379 passed across 36 suites |
+| Development script tests   | 17 passed                   |
+| API TypeScript compilation | Passed                      |
+| Manual frontend checks     | Passed                      |
+
+Manual frontend verification covered authenticated workspace access, business isolation, inventory pagination, name and SKU searches, and stock-status filters.
+
+These results belong to a separate verification checkpoint and must not be added to the historical Phase 2B total of 724 tests. They do not establish production readiness.
 
 ### Recommended next milestone
 
-**Phase 2C: Business Membership Administration Frontend**
+**Product and Variant Image Management Foundation**
 
-Build the frontend experience for authorized users to manage:
+Establish a secure, business-scoped image management system supporting:
 
-- Business memberships.
-- Member roles.
-- Membership suspension and reactivation.
-- Membership removal.
-- Business membership invitations.
-- Invitation acceptance and revocation.
+1. Product-level and variant-level image associations.
+2. Multiple images per product or variant.
+3. Primary image selection and image ordering.
+4. Manual image uploads.
+5. Secure object storage and controlled image access.
+6. Image metadata, validation and lifecycle management.
+7. Product and inventory image previews in the frontend.
+8. A future Shopify image retrieval workflow.
 
-The frontend must use the existing backend authorization model and verified business context.
+The implementation must preserve tenant isolation and must not introduce unauthorized inventory modifications.
+
+Shopify image retrieval should be introduced only after the internal image architecture, authorization rules and storage approach have been implemented and verified.
+
+Live Shopify inventory synchronization, stock writes and source-of-truth cutover remain outside the approved scope.
 
 ### Additional development priorities
 
 Further work includes:
 
-1. Business onboarding and initial owner provisioning.
-2. Authentication and session security hardening.
-3. Comprehensive authorization and tenant-isolation audits.
-4. Membership and invitation audit logging.
-5. Database deployment and recovery verification.
-6. Controlled inventory import and reconciliation.
-7. Inventory ledger and warehouse management.
-8. Orders and returns.
-9. Shopify and marketplace integrations.
-10. Approved inventory source-of-truth cutover.
+1. Product and variant image management foundation, including manual uploads.
+2. Frontend business membership administration and invitation management.
+3. Business onboarding and initial owner provisioning.
+4. Authentication and session security hardening.
+5. Comprehensive authorization and tenant-isolation audits.
+6. Membership and invitation audit logging.
+7. Database deployment, backup and recovery verification.
+8. Controlled inventory import and reconciliation.
+9. Inventory stock movements, ledger and warehouse management.
+10. Orders, fulfillment and returns.
+11. Read-only Shopify product, variant and image retrieval.
+12. Controlled Shopify and marketplace integrations.
+13. Approved inventory source-of-truth cutover.
 
 These remain separate development milestones.
 
@@ -389,7 +465,7 @@ The repository maintains versioned development documentation.
 
 **Current development documentation:**
 
-`docs/development-documentation_v1.6.md`
+`docs/development-documentation_v1.7.md`
 
 This document covers the completed Phase 2B implementation, authentication, membership lifecycle, invitations, migrations, testing, database safety and future development priorities.
 
@@ -399,7 +475,8 @@ This document covers the completed Phase 2B implementation, authentication, memb
 
 **Historical development documentation:**
 
-`docs/development-documentation_v1.5.md`
+- `docs/development-documentation_v1.6.md` (Business Membership Management Phase 2B)
+- `docs/development-documentation_v1.5.md` (Read-only Business Membership Management)
 
 Earlier versions remain historical records.
 
@@ -417,8 +494,14 @@ Historical architecture decisions must be preserved unless separately reviewed.
 
 Inventory-first commerce operations for multiple businesses.
 
-**Current development milestone:** Business Membership Management Phase 2B completed.
+**Current development milestone:** Authenticated frontend workspaces, tenant-scoped dashboard and inventory functionality, and safe local development fixtures implemented on `feature/business-membership-frontend`.
 
-**Next proposed milestone:** Phase 2C, Business Membership Administration Frontend.
+**Latest implementation commit:** `0a1b0ce`.
+
+**Next proposed milestone:** Product and Variant Image Management Foundation, including manual image uploads, secure storage, image previews, and preparation for future Shopify image retrieval.
+
+**Additional planned frontend work:** Business membership administration, role management, and invitation management.
+
+**Inventory source of truth:** The Excel SKU workbook remains authoritative until an explicitly approved cutover.
 
 **Production status:** Not production ready.
