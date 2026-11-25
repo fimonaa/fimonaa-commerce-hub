@@ -41,6 +41,10 @@ import {
   type BusinessMembershipInvitationListItem,
   type BusinessMembershipInvitationListResponse,
 } from "./business-membership-invitation-management.service";
+import {
+  MyBusinessesService,
+  type MyBusinessesResponse,
+} from "./my-businesses.service";
 
 @Controller("auth")
 export class AuthController {
@@ -51,6 +55,7 @@ export class AuthController {
     private readonly businessMembershipInvitationIssuanceService: BusinessMembershipInvitationIssuanceService,
     private readonly businessMembershipInvitationAcceptanceService: BusinessMembershipInvitationAcceptanceService,
     private readonly businessMembershipInvitationManagementService: BusinessMembershipInvitationManagementService,
+    private readonly myBusinessesService: MyBusinessesService,
   ) {}
 
   /**
@@ -215,5 +220,23 @@ export class AuthController {
       authenticatedRequest.user.businessId,
       invitationId,
     );
+  }
+
+  /**
+   * GET /api/auth/my-businesses
+   *
+   * Returns active businesses accessible to the authenticated user.
+   *
+   * Requires a valid JWT but does not require X-Business-Id.
+   * The user ID is derived exclusively from the verified JWT.
+   */
+  @IdentityOnly()
+  @Get("my-businesses")
+  @Header("Cache-Control", "no-store")
+  @HttpCode(HttpStatus.OK)
+  listMyBusinesses(
+    @Req() authenticatedRequest: IdentityAuthenticatedRequest,
+  ): Promise<MyBusinessesResponse> {
+    return this.myBusinessesService.list(authenticatedRequest.user.userId);
   }
 }

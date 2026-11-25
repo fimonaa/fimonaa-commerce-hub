@@ -1,45 +1,41 @@
-import { useEffect, useState } from 'react'
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
-import DashboardPage from '../features/dashboard/pages/DashboardPage'
-import InventoryPage from '../features/inventory/pages/InventoryPage'
-
-type AppPage = 'dashboard' | 'inventory'
-
-// Resolve the current page from the URL so a page can be refreshed
-// or opened directly in the browser.
-function getCurrentPage(): AppPage {
-  return window.location.pathname.startsWith('/inventory')
-    ? 'inventory'
-    : 'dashboard'
-}
+import ProtectedRoute from "../features/auth/components/ProtectedRoute";
+import BusinessSelectionPage from "../features/auth/pages/BusinessSelectionPage";
+import LoginPage from "../features/auth/pages/LoginPage";
+import DashboardPage from "../features/dashboard/pages/DashboardPage";
+import InventoryPage from "../features/inventory/pages/InventoryPage";
 
 function App() {
-  const [page, setPage] = useState<AppPage>(getCurrentPage)
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
 
-  useEffect(() => {
-    // Respond to browser Back and Forward navigation.
-    const handlePopState = () => setPage(getCurrentPage())
+        <Route path="/select-business" element={<BusinessSelectionPage />} />
 
-    window.addEventListener('popstate', handlePopState)
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
 
-    return () => {
-      window.removeEventListener('popstate', handlePopState)
-    }
-  }, [])
+        <Route
+          path="/inventory"
+          element={
+            <ProtectedRoute>
+              <InventoryPage />
+            </ProtectedRoute>
+          }
+        />
 
-  function navigateTo(nextPage: AppPage) {
-    const path = nextPage === 'inventory' ? '/inventory' : '/'
-
-    // Update the URL without forcing a full browser reload.
-    window.history.pushState({}, '', path)
-    setPage(nextPage)
-  }
-
-  if (page === 'inventory') {
-    return <InventoryPage onNavigate={navigateTo} />
-  }
-
-  return <DashboardPage onNavigate={navigateTo} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
