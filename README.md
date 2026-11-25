@@ -1,14 +1,66 @@
 # Fimonaa Commerce Hub
 
-Fimonaa Commerce Hub is an inventory-first, multi-business commerce operations platform under development for Fimonaa India, Fimonaa Finland, and potential future business workspaces.
+**One inventory. Every sales channel. Complete control.**
 
-**Current development checkpoint:** Authenticated frontend workspaces, tenant-scoped dashboard and inventory APIs, and safe development inventory fixtures. Latest implementation commit: `0a1b0ce`.
+Fimonaa Commerce Hub is an inventory-first, multitenant commerce operations platform being developed to help small and growing retail businesses manage products, inventory, orders and sales channels from a single system.
 
-**Status:** The backend includes authentication, account activation, business membership invitations, business-scoped authorization, tenant-scoped dashboard and inventory APIs, membership lifecycle administration, and guarded opening-balance import functionality. The frontend includes login, business workspace selection, authenticated navigation, dashboard, inventory search, stock filtering, and pagination.
+The platform is initially being developed for Fimonaa India, with Fimonaa Finland planned as a subsequent business workspace. Its longer-term objective is to become a configurable SaaS solution for independent retailers across fashion, jewellery, home décor and other retail categories.
+
+### Product Vision
+
+Commerce Hub is designed to address a common challenge faced by businesses selling through multiple channels: maintaining accurate inventory while managing orders across online stores, marketplaces and physical retail locations.
+
+The approved architecture establishes Commerce Hub as the future authoritative inventory system, with the following capabilities planned:
+
+- Centralized inventory management with an auditable stock movement ledger.
+- Multiple inventory locations and location-specific stock visibility.
+- Fixed inventory allocations across sales channels.
+- Configurable safety stock buffers to reduce overselling risk.
+- Centralized order ingestion, processing and stock reservations.
+- Inventory synchronization across connected sales channels.
+- Synchronization monitoring, retries, reconciliation and discrepancy alerts.
+- Tenant-isolated business workspaces with role-based access controls.
+- Extensible integrations and configurable functionality for different retail businesses.
+
+**Important:** These architectural capabilities are planned and must not be interpreted as fully implemented functionality.
+
+The initial production strategy prioritizes fixed channel-specific inventory allocations. Shared inventory pools and more advanced allocation strategies are reserved for future development.
+
+### Current Implementation
+
+The backend currently includes authentication, account activation, business membership invitations, business-scoped authorization, tenant-scoped dashboard and inventory APIs, membership lifecycle administration, and guarded opening-balance import functionality.
+
+The frontend includes login, business workspace selection, authenticated navigation, dashboard, inventory search, stock filtering and pagination.
+
+Guarded local development tooling and synthetic inventory fixtures support development and testing without modifying protected production inventory data.
+
+**Latest recorded implementation commit:** `0a1b0ce`.
+
+**Latest merged development milestone:** Authenticated frontend and business workspace integration, merged into `main` through PR #13 (`efc1289`).
 
 **Production readiness:** The platform is **not production ready**.
 
-The Excel SKU workbook remains the authoritative inventory source until an explicitly approved cutover.
+### Inventory Authority and Production Safety
+
+The existing Fimonaa Excel SKU workbook remains the authoritative inventory source until a separately approved, validated and reconciled production cutover.
+
+Following that cutover, Commerce Hub is intended to become the central inventory authority. Orders originating from Shopify, marketplaces, physical stores or other supported channels will be processed centrally, with updated inventory availability synchronized to connected channels.
+
+Shopify integration is the first planned external sales channel integration. Myntra integration will follow subject to technical feasibility, API availability and partner permissions.
+
+**No live inventory synchronization, marketplace integration or production inventory cutover is implied by the current development status.**
+
+The protected `fimonaa_commerce` database must not be modified without explicit authorization.
+
+### Next Engineering Priority
+
+The next milestone is the **Production Inventory and Order Management Foundation**, beginning with an existing-codebase gap analysis.
+
+This work will assess the existing product, variant, SKU, inventory and database structures before introducing production-grade stock movements, reservations, locations, channel allocations and order processing.
+
+Advanced product and variant image management is deferred to a later milestone.
+
+For the approved architecture, implementation sequence and production migration strategy, refer to `docs/development-documentation_v1.8.md`.
 
 ## Repository layout
 
@@ -359,20 +411,22 @@ Do not run integration tests until the database safety checks have been confirme
 
 ### Completed milestones
 
-| Milestone                               | Reference                            | Status             |
-| --------------------------------------- | ------------------------------------ | ------------------ |
-| Business-scoped inventory authorization | PR #6, `d4e5296`                     | Merged             |
-| Authentication and initial invitations  | PR #7, `d1c25be`                     | Merged             |
-| Development Documentation v1.4          | PR #8, `537bc9f`                     | Merged             |
-| Business Membership Management Phase 1  | PR #9, `5de2992`                     | Merged             |
-| Development Documentation v1.5          | PR #10, `f757124`                    | Merged             |
-| Business Membership Management Phase 2B | PR #11, `c852d35`                    | Merged             |
-| Development Documentation v1.6          | Historical Phase 2B documentation    | Superseded by v1.7 |
-| Development Documentation v1.7          | feature/business-membership-frontend | In progress        |
+| Milestone                               | Reference                             | Status             |
+| --------------------------------------- | ------------------------------------- | ------------------ |
+| Business-scoped inventory authorization | PR #6, `d4e5296`                      | Merged             |
+| Authentication and initial invitations  | PR #7, `d1c25be`                      | Merged             |
+| Development Documentation v1.4          | PR #8, `537bc9f`                      | Merged             |
+| Business Membership Management Phase 1  | PR #9, `5de2992`                      | Merged             |
+| Development Documentation v1.5          | PR #10, `f757124`                     | Merged             |
+| Business Membership Management Phase 2B | PR #11, `c852d35`                     | Merged             |
+| Development Documentation v1.6          | Historical Phase 2B documentation     | Superseded by v1.7 |
+| Authenticated frontend and workspaces   | PR #13, `efc1289`                     | Merged             |
+| Development Documentation v1.7          | PR #13, `efc1289`                     | Merged             |
+| Development Documentation v1.8          | `docs/commerce-hub-architecture-v1.8` | In progress        |
 
 ### Current frontend implementation
 
-The `feature/business-membership-frontend` branch includes the following implemented functionality:
+The authenticated frontend implementation, merged into `main` through PR #13 (`efc1289`), includes the following functionality:
 
 - Typed authenticated API client.
 - Authentication context and session management.
@@ -385,7 +439,7 @@ The `feature/business-membership-frontend` branch includes the following impleme
 - Guarded local development tooling.
 - Synthetic development authentication and inventory fixtures.
 
-These changes have been committed on the development branch. They must not be described as merged into `main` until the pull request has been reviewed and merged.
+These changes were reviewed and merged into `main` through PR #13 (`efc1289`). They establish the current frontend development baseline but do not constitute production readiness or authorization to modify live inventory.
 
 The historical Phase 2B backend membership-management milestone remains complete. The frontend membership administration screens, including invitation management, role changes, suspension and removal, remain future work unless separately verified.
 
@@ -406,79 +460,175 @@ These results belong to a separate verification checkpoint and must not be added
 
 ### Recommended next milestone
 
-**Product and Variant Image Management Foundation**
+**Production Inventory and Order Management Foundation**
 
-Establish a secure, business-scoped image management system supporting:
+**Status:** Approved for planning. Implementation has not started.
 
-1. Product-level and variant-level image associations.
-2. Multiple images per product or variant.
-3. Primary image selection and image ordering.
-4. Manual image uploads.
-5. Secure object storage and controlled image access.
-6. Image metadata, validation and lifecycle management.
-7. Product and inventory image previews in the frontend.
-8. A future Shopify image retrieval workflow.
+The immediate next engineering activity is a comprehensive existing-codebase gap analysis.
 
-The implementation must preserve tenant isolation and must not introduce unauthorized inventory modifications.
+This analysis must examine the current product, variant, SKU, inventory, database and authorization structures before introducing new production functionality.
 
-Shopify image retrieval should be introduced only after the internal image architecture, authorization rules and storage approach have been implemented and verified.
+The foundation will be developed incrementally, with the following priorities:
 
-Live Shopify inventory synchronization, stock writes and source-of-truth cutover remain outside the approved scope.
+1. **Inventory data model:** Establish an auditable inventory ledger with explicit physical, reserved and available stock quantities.
+2. **Multiple inventory locations:** Support location-specific inventory records from the outset, initially using one default location for Fimonaa India.
+3. **Stock movements:** Introduce controlled stock adjustments, receipts and other inventory transactions with traceability and authorization.
+4. **Order management:** Establish order records, lifecycle states, transactional stock reservations, cancellations and returns.
+5. **Channel-specific allocations:** Allow authorized users to assign fixed inventory quantities to individual sales channels.
+6. **Safety stock buffers:** Support configurable stock buffers that reduce the risk of overselling.
+7. **Reliable order ingestion:** Design idempotent order processing that prevents duplicate stock deductions.
+8. **Synchronization architecture:** Introduce background processing, retries, failure monitoring, reconciliation and auditability.
+9. **Excel inventory migration:** Prepare a validated and reconciled migration from the existing Fimonaa SKU workbook.
+10. **Controlled production cutover:** Transfer inventory authority to Commerce Hub only after explicit approval and successful operational verification.
+
+**Initial integration priority:** Shopify, followed by Myntra subject to available integration capabilities and seller permissions.
+
+Fixed channel-specific allocations are the initial inventory distribution strategy. Shared inventory pools and dynamic allocation strategies remain future enhancements.
+
+Product and variant image management is deferred until the core inventory and order management foundation has progressed sufficiently.
+
+**Production safety:** The existing Excel SKU workbook remains authoritative. No production database changes, live inventory writes or marketplace synchronization may be enabled without separate approval.
+
+The detailed architecture, implementation roadmap, migration strategy and acceptance criteria are documented in `docs/development-documentation_v1.8.md`, Sections 22 through 25.
 
 ### Additional development priorities
 
-Further work includes:
+Further development will follow a phased approach, prioritizing reliable inventory operations before external integrations and commercial expansion.
 
-1. Product and variant image management foundation, including manual uploads.
-2. Frontend business membership administration and invitation management.
-3. Business onboarding and initial owner provisioning.
-4. Authentication and session security hardening.
-5. Comprehensive authorization and tenant-isolation audits.
-6. Membership and invitation audit logging.
-7. Database deployment, backup and recovery verification.
-8. Controlled inventory import and reconciliation.
-9. Inventory stock movements, ledger and warehouse management.
-10. Orders, fulfillment and returns.
-11. Read-only Shopify product, variant and image retrieval.
-12. Controlled Shopify and marketplace integrations.
-13. Approved inventory source-of-truth cutover.
+1. Existing-codebase gap analysis covering products, variants, SKUs, inventory, database relationships and authorization.
+2. Production inventory data model, transaction ledger and stock movement workflows.
+3. Multiple inventory locations and location-specific stock management.
+4. Centralized order management, stock reservations, cancellations and returns.
+5. Fixed channel-specific inventory allocations and configurable safety stock buffers.
+6. Background processing, idempotency, synchronization monitoring, retries and reconciliation.
+7. Controlled Excel SKU workbook migration, inventory validation and reconciliation.
+8. Shopify integration, including authorized order ingestion and inventory synchronization.
+9. Controlled production cutover following explicit approval and operational verification.
+10. Myntra integration, subject to technical feasibility, API availability and seller permissions.
+11. Frontend business membership administration, invitations and role management.
+12. Business onboarding, initial owner provisioning and workspace administration.
+13. Authentication hardening, authorization audits and tenant-isolation verification.
+14. Audit logging, operational monitoring, database backup and recovery procedures.
+15. Fimonaa Finland onboarding, including location, currency and country-specific operational requirements.
+16. Advanced product and variant image management, including secure uploads and image retrieval.
+17. Native invoicing, configurable retail attributes and additional marketplace integrations.
+18. Commercial SaaS capabilities, including tenant onboarding, subscription management and operational administration.
 
-These remain separate development milestones.
+These priorities represent the intended development direction, not completed functionality.
+
+The exact implementation order and scope will be refined following the existing-codebase gap analysis. Security, tenant isolation, database safety and operational reliability remain mandatory throughout development.
+
+The Excel SKU workbook will remain authoritative until an explicitly approved production cutover. Shopify and marketplace integrations must not perform live inventory writes before their respective authorization, testing and operational readiness requirements have been satisfied.
 
 ## Shopify and marketplace integration
 
+**Implementation status:** Planned. Live Shopify and marketplace order ingestion, inventory synchronization and channel allocation workflows have not yet been implemented.
+
+### Central Inventory Authority
+
+Following an explicitly approved production cutover, Commerce Hub is intended to become the authoritative inventory system for connected business operations.
+
+Orders may originate from Shopify, Myntra, physical retail locations or other supported channels. Commerce Hub will process those orders centrally, maintain inventory reservations and stock movements, and synchronize updated availability across connected sales channels.
+
+Until that cutover is completed, the existing Excel SKU workbook remains the authoritative inventory source.
+
+### Channel-Specific Inventory Allocation
+
+The initial integration strategy uses fixed inventory allocations.
+
+For example, if a product variant has four available units, an authorized inventory manager may allocate three units to Myntra and one unit to Shopify.
+
+The system must track:
+
+1. Physical inventory and reserved inventory.
+2. Available inventory at each location.
+3. Channel-specific inventory allocations.
+4. Configurable safety stock buffers.
+5. Unallocated inventory.
+6. Confirmed inventory quantities on external channels.
+7. Pending, failed and completed synchronization operations.
+
+Allocations must not exceed eligible available inventory.
+
+Inventory must not be offered to another channel while a conflicting external inventory update remains unresolved.
+
+Shared inventory pools and dynamic allocation strategies are planned as future enhancements.
+
+### Integration Priorities
+
+**Shopify is the first planned integration.**
+
+The proposed integration includes authorized product and variant mapping, order ingestion, webhook processing, inventory synchronization, retry handling and reconciliation.
+
+**Myntra is the next planned marketplace integration**, subject to technical feasibility, API availability and the permissions granted to the relevant seller account.
+
+Additional marketplace connectors will follow a reusable integration architecture.
+
+No connector should be represented as operational until its capabilities have been implemented, tested and explicitly enabled.
+
+### Reliability and Operational Controls
+
+External order processing and inventory synchronization must support:
+
+1. Idempotent event processing to prevent duplicate stock deductions.
+2. Transactional inventory reservations and controlled stock movements.
+3. Background processing and reliable event delivery.
+4. Retry handling with appropriate failure classification.
+5. Synchronization status visibility and operational alerts.
+6. Reconciliation between Commerce Hub and connected sales channels.
+7. Audit trails for inventory changes and integration operations.
+8. Recovery procedures for failed, delayed or conflicting updates.
+
+The implementation must account for delayed webhooks, duplicate events, concurrent orders, cancellations, returns and temporary marketplace outages.
+
+### Security and Production Restrictions
+
 Shopify OAuth, webhook handling and live integration credentials must be configured and tested before use.
 
-Review required scopes and permissions against the actual integration design.
+Required scopes and permissions must be reviewed against the actual integration design. Proposed scopes in the existing scaffold are not automatically approved.
 
-Do not treat the scaffold's proposed scopes as approved.
-
-Keep client secrets and access tokens out of frontend code and Git.
-
-Live stock writes require an approved design for inventory reservations, idempotency, reconciliation and operational recovery.
+Client secrets, access tokens and other credentials must remain outside frontend code and Git.
 
 Marketplace connectors must use only capabilities authorized for the relevant seller account.
 
+Live inventory writes require an approved design, verified authorization, integration testing, reconciliation procedures and operational recovery controls.
+
+**No production inventory synchronization or source-of-truth cutover may be enabled without explicit approval.**
+
+The protected `fimonaa_commerce` database must remain unchanged unless a specific operation has been separately authorized.
+
+For the detailed architecture, refer to Sections 23 and 24 of `docs/development-documentation_v1.8.md`.
+
 ## Documentation
 
-The repository maintains versioned development documentation.
+The repository maintains versioned development documentation, implementation plans and architecture decision records.
 
-**Current development documentation:**
+**Current development documentation (v1.8, in progress):**
+
+`docs/development-documentation_v1.8.md`
+
+Version 1.8 documents the revised Commerce Hub product vision, production inventory architecture, multiple inventory locations, fixed channel allocations, safety stock buffers, multichannel order processing, synchronization strategy, Excel migration and proposed SaaS evolution.
+
+This version is being prepared on `docs/commerce-hub-architecture-v1.8` and must not be described as merged until its pull request has been approved and merged.
+
+**Latest merged development documentation:**
 
 `docs/development-documentation_v1.7.md`
 
-This document covers the completed Phase 2B implementation, authentication, membership lifecycle, invitations, migrations, testing, database safety and future development priorities.
+Version 1.7 records the authenticated frontend implementation, business workspace integration, development tooling and the historical image management proposal. It was merged into `main` through PR #13 (`efc1289`).
 
 **Implementation plan:**
 
 `docs/IMPLEMENTATION_PLAN.md`
+
+The implementation plan should be read alongside development documentation v1.8 for the current production inventory and order management priorities.
 
 **Historical development documentation:**
 
 - `docs/development-documentation_v1.6.md` (Business Membership Management Phase 2B)
 - `docs/development-documentation_v1.5.md` (Read-only Business Membership Management)
 
-Earlier versions remain historical records.
+Earlier versions remain historical records and should not be overwritten.
 
 **Architecture decisions:**
 
@@ -492,16 +642,4 @@ Historical architecture decisions must be preserved unless separately reviewed.
 
 **Fimonaa Commerce Hub**
 
-Inventory-first commerce operations for multiple businesses.
-
-**Current development milestone:** Authenticated frontend workspaces, tenant-scoped dashboard and inventory functionality, and safe local development fixtures implemented on `feature/business-membership-frontend`.
-
-**Latest implementation commit:** `0a1b0ce`.
-
-**Next proposed milestone:** Product and Variant Image Management Foundation, including manual image uploads, secure storage, image previews, and preparation for future Shopify image retrieval.
-
-**Additional planned frontend work:** Business membership administration, role management, and invitation management.
-
-**Inventory source of truth:** The Excel SKU workbook remains authoritative until an explicitly approved cutover.
-
-**Production status:** Not production ready.
+One inventory. Every sales channel. Complete control.
