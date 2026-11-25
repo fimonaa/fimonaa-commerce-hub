@@ -25,6 +25,11 @@ const commands = {
   ],
 
   "seed:dev-auth": ["ts-node", "src/database/seed-development-auth.ts"],
+
+  "seed:dev-inventory": [
+    "ts-node",
+    "src/database/run-development-inventory-seed.ts",
+  ],
 };
 
 function fail(message) {

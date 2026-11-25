@@ -66,6 +66,58 @@ function runIsolatedLauncher(
   }
 }
 
+
+test("inventory seed rejects the protected database", () => {
+  const result = runIsolatedLauncher(
+    "DATABASE_URL=postgresql://localhost:5432/fimonaa_commerce",
+    {},
+    "seed:dev-inventory",
+  );
+
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /Database connection is not the approved local development database/,
+  );
+  assert.doesNotMatch(
+    result.stdout,
+    /Development database safety check passed/,
+  );
+});
+
+test("inventory seed rejects remote databases", () => {
+  const result = runIsolatedLauncher(
+    "DATABASE_URL=postgresql://remote.example.com:5432/fimonaa_commerce_dev",
+    {},
+    "seed:dev-inventory",
+  );
+
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /Database connection is not the approved local development database/,
+  );
+  assert.doesNotMatch(
+    result.stdout,
+    /Development database safety check passed/,
+  );
+});
+
+test("inventory seed rejects missing database configuration", () => {
+  const result = runIsolatedLauncher(
+    "NODE_ENV=development",
+    {},
+    "seed:dev-inventory",
+  );
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /DATABASE_URL is missing/);
+  assert.doesNotMatch(
+    result.stdout,
+    /Development database safety check passed/,
+  );
+});
+
 test("rejects missing development environment file", () => {
   const result = runIsolatedLauncher(null);
 
