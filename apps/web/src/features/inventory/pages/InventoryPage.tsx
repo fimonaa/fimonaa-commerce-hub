@@ -165,6 +165,11 @@ export default function InventoryPage() {
   const meta = result?.meta;
   const items = result?.data ?? [];
   const totalPages = meta?.totalPages ?? 0;
+
+  // An unfiltered empty result indicates that the workspace has no SKUs.
+  // Filtered results may be empty even when inventory exists.
+  const hasActiveFilters = search.trim() !== "" || stockStatus !== "all";
+  const hasNoResults = !loading && !error && meta?.totalItems === 0;
   const startItem =
     meta && meta.totalItems > 0 ? (meta.page - 1) * meta.limit + 1 : 0;
   const endItem = meta ? Math.min(meta.page * meta.limit, meta.totalItems) : 0;
@@ -223,11 +228,25 @@ export default function InventoryPage() {
             value={meta?.totalItems}
             description="Items matching the current search and filter"
           />
-          <SummaryCard
-            label="Current page"
-            value={meta?.page}
-            description={`Page size: ${PAGE_SIZE} records`}
-          />
+          {hasNoResults ? (
+            <article className="rounded-2xl border border-[#eee5e4] bg-white p-5 shadow-sm">
+              <p className="text-sm font-medium text-[#827579]">
+                Current page
+              </p>
+              <p className="mt-4 text-2xl font-semibold tracking-tight">
+                No pages
+              </p>
+              <p className="mt-2 text-xs text-[#a09295]">
+                No inventory records to display
+              </p>
+            </article>
+          ) : (
+            <SummaryCard
+              label="Current page"
+              value={meta?.page}
+              description={`Page size: ${PAGE_SIZE} records`}
+            />
+          )}
           <SummaryCard
             label="Total pages"
             value={meta?.totalPages}
@@ -351,10 +370,14 @@ export default function InventoryPage() {
                   <tr>
                     <td colSpan={6} className="px-5 py-16 text-center">
                       <p className="text-sm font-semibold">
-                        No matching inventory found
+                        {hasActiveFilters
+                          ? "No matching products found"
+                          : "Your inventory is empty"}
                       </p>
                       <p className="mt-2 text-xs text-[#96898d]">
-                        Try another search term or stock filter.
+                        {hasActiveFilters
+                          ? "Try a different search term or adjust your stock filters."
+                          : "No inventory records have been added to this workspace yet. Once products are added, they'll appear here."}
                       </p>
                     </td>
                   </tr>
@@ -393,9 +416,11 @@ export default function InventoryPage() {
 
           <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[#f1e9e8] px-5 py-4 sm:px-6">
             <p className="text-xs text-[#887c7f]" aria-live="polite">
-              {meta
-                ? `Showing ${startItem.toLocaleString("en-IN")}–${endItem.toLocaleString("en-IN")} of ${meta.totalItems.toLocaleString("en-IN")} items`
-                : "Waiting for inventory data"}
+              {hasNoResults
+                ? "No results to display"
+                : meta
+                  ? `Showing ${startItem.toLocaleString("en-IN")}–${endItem.toLocaleString("en-IN")} of ${meta.totalItems.toLocaleString("en-IN")} items`
+                  : "Waiting for inventory data"}
             </p>
 
             <div className="flex items-center gap-2">
@@ -409,7 +434,11 @@ export default function InventoryPage() {
               </button>
 
               <span className="px-2 text-xs text-[#756b6e]">
-                {meta ? `${meta.page} / ${totalPages}` : "—"}
+                {hasNoResults
+                  ? "No pages available"
+                  : meta
+                    ? `${meta.page} / ${totalPages}`
+                    : "—"}
               </span>
 
               <button
